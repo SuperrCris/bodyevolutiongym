@@ -3,11 +3,10 @@
 namespace App\Domain\Membresias;
 
 use App\Domain\Auditoria\AuditoriaServicio;
-
 use App\Models\Cliente;
 use App\Models\Membresia;
-use App\Models\TipoMembresia;
 use App\Models\Pago;
+use App\Models\TipoMembresia;
 use App\Models\Usuario;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -28,7 +27,7 @@ class MembresiasServicio
 
         return DB::transaction(function () use ($cliente, $plan, $metodoPago, $vendedor, $referencia, $auditoria): Membresia {
             $clienteActual = $cliente->membresias()
-                ->where('estado', 'activo')
+                ->where('estado', Membresia::ESTADO_ACTIVA)
                 ->whereDate('finalizacion', '>=', now()->toDateString())
                 ->latest('finalizacion')
                 ->lockForUpdate()
@@ -41,13 +40,13 @@ class MembresiasServicio
                 'tipo_membresia_id' => $plan->id,
                 'comienzo' => $empieza,
                 'finalizacion' => $termina,
-                'estado' => 'active',
+                'estado' => Membresia::ESTADO_ACTIVA,
             ]);
 
             Pago::create([
-                'cliente_id' => $cliente->id,
+                'id_cliente' => $cliente->id,
                 'membresia_id' => $membresiaActual->id,
-                'user_id' => $vendedor?->id,
+                'usuario_id' => $vendedor?->id,
                 'monto' => $plan->precio,
                 'metodo_pago' => $metodoPago,
                 'referencia' => $referencia,
@@ -64,58 +63,60 @@ class MembresiasServicio
                 usuarioId: $vendedor?->id,
             );
 
-            return $membresiaActual->load(['cliente', 'tipo_membresia']);
+            return $membresiaActual->load(['cliente', 'plan']);
         });
     }
 
-
-
-public function crearClienteConMembresia(
-    array $datosCliente,
-    TipoMembresia $plan,
-    string $metodoPago,
-    ?Usuario $usuario = null,
-    ?string $referencia = null,
-    ?AuditoriaServicio $auditoria = null,
-): Membresia {
-    return DB::transaction(function () use (
-        $datosCliente,
-        $plan,
-        $metodoPago,
-        $usuario,
-        $referencia,
-        $auditoria,
+    public function crearClienteConMembresia(
+        array $datosCliente,
+        TipoMembresia $plan,
+        string $metodoPago,
+        ?Usuario $usuario = null,
+        ?string $referencia = null,
+        ?AuditoriaServicio $auditoria = null,
     ): Membresia {
-        $cliente = Cliente::create($datosCliente);
+        if (! $plan->activo) {
+            throw new InvalidArgumentException('El plan de membresía no está activo.');
+        }
 
-        $membresia = $cliente->membresias()->create([
-            'tipo_membresia_id' => $plan->id,
-            'comienzo' => now(),
-            'finalizacion' => now()->addDays($plan->duracion_dias - 1),
-            'estado' => 'active',
-        ]);
+        return DB::transaction(function () use (
+            $datosCliente,
+            $plan,
+            $metodoPago,
+            $usuario,
+            $referencia,
+            $auditoria,
+        ): Membresia {
+            $cliente = Cliente::create($datosCliente);
+            $comienzo = now()->startOfDay();
 
-        $membresia->pagos()->create([
-            'id_cliente' => $cliente->id,
-            'usuario_id' => $usuario?->id,
-            'monto' => $plan->precio,
-            'metodo_pago' => $metodoPago,
-            'referencia' => $referencia,
-        ]);
+            $membresia = $cliente->membresias()->create([
+                'tipo_membresia_id' => $plan->id,
+                'comienzo' => $comienzo,
+                'finalizacion' => $comienzo->copy()->addDays($plan->duracion_dias - 1),
+                'estado' => Membresia::ESTADO_ACTIVA,
+            ]);
 
-        ($auditoria ?? app(AuditoriaServicio::class))->registrar(
-            accion: 'membresia.creada',
-            registro: $membresia,
-            metadatos: [
-                'plan_id' => $plan->id,
-                'cliente_id' => $cliente->id,
+            $membresia->pagos()->create([
+                'id_cliente' => $cliente->id,
+                'usuario_id' => $usuario?->id,
                 'monto' => $plan->precio,
-            ],
-            usuarioId: $usuario?->id,
-        );
+                'metodo_pago' => $metodoPago,
+                'referencia' => $referencia,
+            ]);
 
-        return $membresia;
-    });
-}
+            ($auditoria ?? app(AuditoriaServicio::class))->registrar(
+                accion: 'membresia.creada',
+                registro: $membresia,
+                metadatos: [
+                    'plan_id' => $plan->id,
+                    'cliente_id' => $cliente->id,
+                    'monto' => $plan->precio,
+                ],
+                usuarioId: $usuario?->id,
+            );
 
+            return $membresia->load(['cliente', 'plan']);
+        });
+    }
 }

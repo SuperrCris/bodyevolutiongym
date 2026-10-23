@@ -2,7 +2,8 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
+use App\Models\TipoMembresia;
+use App\Models\Usuario;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -15,11 +16,15 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::factory()->create([
+        Usuario::query()->updateOrCreate(['email' => 'admin@bodyevolutiongym.test'], [
             'name' => 'Test User',
-            'email' => 'test@example.com',
+            'password' => 'password',
+        ]);
+
+        TipoMembresia::query()->updateOrCreate(['nombre' => 'Plan mensual'], [
+            'duracion_dias' => 30,
+            'precio' => 499.00,
+            'activo' => true,
         ]);
     }
 }

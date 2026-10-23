@@ -2,8 +2,8 @@
 
 namespace App\Providers;
 
-use App\Domain\Biometrics\BiometricVerifier;
-use App\Domain\Biometrics\SdkBiometricVerifier;
+use App\Domain\Biometria\VerificadorBiometrico;
+use App\Domain\Biometria\VerificadorBiometricoSdk;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -13,7 +13,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->bind(BiometricVerifier::class, SdkBiometricVerifier::class);
+        $this->app->bind(VerificadorBiometrico::class, VerificadorBiometricoSdk::class);
     }
 
     /**

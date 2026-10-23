@@ -13,5 +13,9 @@ Route::prefix('v1')->group(function (): void {
     Route::get('membership-plans', [MembershipPlanController::class, 'index']);
     Route::post('membership-plans', [MembershipPlanController::class, 'store']);
     Route::post('customers/{customer}/memberships/renew', [MembershipController::class, 'renew']);
-    Route::post('biometrics/verify', [BiometricController::class, 'verify']);
+    Route::middleware(['web', 'auth'])->group(function (): void {
+        Route::post('biometrics/verify', [BiometricController::class, 'verify']);
+        Route::post('biometrics/capture', [BiometricController::class, 'capture']);
+        Route::post('customers/{cliente}/biometrics/enroll', [BiometricController::class, 'enroll']);
+    });
 });

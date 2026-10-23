@@ -6,19 +6,20 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-
-//Modelo de membresia
+// Modelo de membresia
 
 #[Fillable(['nombre', 'duracion_dias', 'precio', 'activo'])]
 class TipoMembresia extends Model
 {
+    protected $table = 'tipo_membresias';
+
     protected $casts = [
         'precio' => 'decimal:2',
         'activo' => 'boolean',
     ];
 
-    public function memberships(): HasMany
+    public function membresias(): HasMany
     {
-        return $this->hasMany(Membresia::class);
+        return $this->hasMany(Membresia::class, 'tipo_membresia_id');
     }
 }

@@ -32,8 +32,8 @@ return new class extends Migration
 
         Schema::create('memberships', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('customer_id')->constrained()->restrictOnDelete();
-            $table->foreignId('membership_plan_id')->constrained()->restrictOnDelete();
+            $table->foreignId('customer_id')->constrained();
+            $table->foreignId('membership_plan_id')->constrained();
             $table->date('starts_at');
             $table->date('ends_at');
             $table->string('status')->default('active');
@@ -43,7 +43,7 @@ return new class extends Migration
 
         Schema::create('payments', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('customer_id')->constrained()->restrictOnDelete();
+            $table->foreignId('customer_id')->constrained();
             $table->foreignId('membership_id')->nullable()->constrained()->nullOnDelete();
             $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
             $table->decimal('amount', 10, 2);

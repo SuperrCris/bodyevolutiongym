@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable(['id_cliente', 'membresia_id', 'usuario_id', 'monto', 'metodo_pago', 'referencia'])]
 class Pago extends Model
 {
+    protected $table = 'pagos';
+
     protected function casts(): array
     {
         return ['monto' => 'decimal:2'];
@@ -26,11 +28,6 @@ class Pago extends Model
 
     public function usuario(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'usuario_id');
-    }
-
-    public function metodoPago(): BelongsTo
-    {
-        return $this->belongsTo(MetodoPago::class, 'metodo_pago');
+        return $this->belongsTo(Usuario::class, 'usuario_id');
     }
 }
