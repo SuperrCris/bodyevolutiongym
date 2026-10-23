@@ -1,0 +1,18 @@
+La idea es crear un punto de venta para un gimnasio que
+maneja membresias
+- Diario
+- Semanal
+- Quincenal
+- Mensual
+- Bimestral
+- entre otros
+
+Cuenta con funciones como registro, renovacion, autenticacion
+mediante huella y creacion de reportes
+
+Se requiere que la autenticacion funcione de forma asincrona,
+de manera que quien lo este manejando pueda corroborar vigencias
+de usuarios mientras puede seguir renovando o creando membresias
+
+Se utiliza el lector de huellas U.are.U 4500 con el SDK
+DigitalPersona
