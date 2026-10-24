@@ -13,5 +13,10 @@ interface VerificadorBiometrico
 
     public function capturar(string $terminalIdentifier): string;
 
+    /**
+     * @return array{seq: int, sample: ?string}
+     */
+    public function escuchar(?int $despuesDe): array;
+
     public function enrolar(Cliente $cliente, string $terminalIdentifier): array;
 }

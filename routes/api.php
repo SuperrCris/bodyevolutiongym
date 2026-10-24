@@ -16,6 +16,7 @@ Route::prefix('v1')->group(function (): void {
     Route::middleware(['web', 'auth'])->group(function (): void {
         Route::post('biometrics/verify', [BiometricController::class, 'verify']);
         Route::post('biometrics/capture', [BiometricController::class, 'capture']);
+        Route::get('biometrics/scan', [BiometricController::class, 'scan']);
         Route::post('customers/{cliente}/biometrics/enroll', [BiometricController::class, 'enroll']);
     });
 });

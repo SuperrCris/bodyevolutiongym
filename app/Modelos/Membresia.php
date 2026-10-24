@@ -32,7 +32,7 @@ class Membresia extends Model
     public function estaActiva(): bool
     {
         return $this->estado === self::ESTADO_ACTIVA
-            && $this->finalizacion?->isTodayOrFuture() === true;
+            && $this->finalizacion?->greaterThanOrEqualTo(today()) === true;
     }
 
     public function pagos(): HasMany

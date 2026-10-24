@@ -111,6 +111,40 @@ test('actualizar la huella desactiva la credencial anterior', function () {
         ->and(CredencialBiometrica::query()->where('id_cliente', $cliente->id)->where('estado', true)->count())->toBe(1);
 });
 
+test('el sondeo continuo identifica al cliente y devuelve su membresía', function () {
+    Http::fake([
+        'http://127.0.0.1:8765/poll*' => Http::response(['seq' => 4, 'sample' => base64_encode('muestra')]),
+        'http://127.0.0.1:8765/verify' => Http::response(['matched' => true]),
+    ]);
+
+    $cliente = Cliente::create(['nombre' => 'Ana', 'apellido' => 'Gómez', 'email' => 'ana.scan@example.com']);
+    $cliente->credencialesBiometricas()->create([
+        'proveedor' => 'digitalpersona',
+        'id_externo' => 'credencial-scan',
+        'plantilla' => base64_encode('plantilla'),
+        'estado' => true,
+    ]);
+    $usuario = Usuario::create(['name' => 'Operador', 'email' => 'op.scan@example.com', 'password' => 'password']);
+
+    $this->actingAs($usuario)
+        ->getJson('/api/v1/biometrics/scan?after=3')
+        ->assertOk()
+        ->assertJsonPath('seq', 4)
+        ->assertJsonPath('matched', true)
+        ->assertJsonPath('cliente.nombre', 'Ana Gómez')
+        ->assertJsonPath('cliente.vigente', false);
+});
+
+test('el sondeo continuo no notifica cuando no hay huella nueva', function () {
+    Http::fake(['http://127.0.0.1:8765/poll*' => Http::response(['seq' => 4])]);
+    $usuario = Usuario::create(['name' => 'Operador', 'email' => 'op.vacio@example.com', 'password' => 'password']);
+
+    $this->actingAs($usuario)
+        ->getJson('/api/v1/biometrics/scan?after=4')
+        ->assertOk()
+        ->assertJson(['seq' => 4, 'detected' => false]);
+});
+
 test('devuelve 503 claro cuando el puente biométrico está apagado', function () {
     Http::fake(fn () => throw new ConnectionException('refused'));
 

@@ -23,6 +23,36 @@ class BiometricController extends Controller
         ));
     }
 
+    /**
+     * Sondeo rápido de la lectura continua: identifica al cliente si hay una huella nueva.
+     */
+    public function scan(Request $request, VerificadorBiometrico $verifier): JsonResponse
+    {
+        $data = $request->validate(['after' => ['nullable', 'integer', 'min:0']]);
+        $lectura = $verifier->escuchar(isset($data['after']) ? (int) $data['after'] : null);
+
+        if ($lectura['sample'] === null) {
+            return response()->json(['seq' => $lectura['seq'], 'detected' => false]);
+        }
+
+        $resultado = $verifier->verificar($lectura['sample'], (string) config('biometria.terminal'));
+        $respuesta = ['seq' => $lectura['seq'], 'detected' => true, 'matched' => $resultado['matched']];
+
+        if ($resultado['matched']) {
+            $cliente = Cliente::query()->findOrFail($resultado['id_cliente']);
+            $membresia = $cliente->membresias()->with('plan')->latest('finalizacion')->first();
+            $respuesta['cliente'] = [
+                'id' => $cliente->id,
+                'nombre' => trim($cliente->nombre.' '.$cliente->apellido),
+                'plan' => $membresia?->plan?->nombre,
+                'vigente' => $membresia?->estaActiva() ?? false,
+                'vence' => $membresia?->finalizacion?->format('d/m/Y'),
+            ];
+        }
+
+        return response()->json($respuesta);
+    }
+
     public function capture(Request $request, VerificadorBiometrico $verifier): JsonResponse
     {
         $data = $request->validate([

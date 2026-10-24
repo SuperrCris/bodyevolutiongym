@@ -47,6 +47,16 @@ class VerificadorBiometricoSdk implements VerificadorBiometrico
         return $resultado['sample'];
     }
 
+    public function escuchar(?int $despuesDe): array
+    {
+        $resultado = $this->solicitar('/poll'.($despuesDe === null ? '' : '?after='.$despuesDe), [], 5);
+
+        return [
+            'seq' => (int) ($resultado['seq'] ?? 0),
+            'sample' => is_string($resultado['sample'] ?? null) ? $resultado['sample'] : null,
+        ];
+    }
+
     public function enrolar(Cliente $cliente, string $terminalIdentifier): array
     {
         $resultado = $this->solicitar(

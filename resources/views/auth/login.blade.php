@@ -4,12 +4,13 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Acceso | Body Evolution Gym</title>
+    <link rel="icon" type="image/png" href="{{ asset('images/logo.png') }}">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-screen bg-slate-950 text-slate-100">
     <main class="grid min-h-screen lg:grid-cols-[1.1fr_0.9fr]">
         <section class="hidden flex-col justify-between bg-teal-400 p-10 text-slate-950 lg:flex">
-            <div class="text-sm font-black tracking-[0.3em]">BODY EVOLUTION</div>
+            <img src="{{ asset('images/logo.png') }}" alt="Body Evolution Gym" class="h-20 w-auto self-start brightness-0">
             <div>
                 <p class="mb-4 text-sm font-semibold uppercase tracking-[0.25em] text-slate-800/70">Panel de operaciones</p>
                 <h1 class="max-w-xl text-6xl font-black leading-[0.95] tracking-tight">Cada sesión cuenta.</h1>
@@ -20,7 +21,7 @@
         <section class="flex items-center justify-center px-6 py-12">
             <div class="w-full max-w-md">
                 <div class="mb-10">
-                    <span class="mb-5 grid size-12 place-items-center rounded-2xl bg-teal-400 font-black text-slate-950 lg:hidden">BE</span>
+                    <img src="{{ asset('images/logo.png') }}" alt="Body Evolution Gym" class="mb-6 h-14 w-auto lg:hidden">
                     <p class="text-sm font-semibold uppercase tracking-[0.25em] text-teal-300">Bienvenido de nuevo</p>
                     <h1 class="mt-3 text-4xl font-black tracking-tight">Inicia sesión</h1>
                     <p class="mt-3 text-slate-400">Accede al panel para continuar con la operación.</p>

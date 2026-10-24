@@ -38,6 +38,13 @@ public final class BodyEvolutionBiometria {
     private static final int PORT = 8765;
     private static final long CAPTURE_TIMEOUT_SECONDS = 40;
     private static final ReentrantLock CAPTURE_LOCK = new ReentrantLock();
+    private static final Object LISTENER_LOCK = new Object();
+    private static final Object STATE_LOCK = new Object();
+    private static volatile DPFPCapture listener;
+    private static volatile boolean listenerPaused;
+    private static volatile long ignoreUntil;
+    private static long sampleSeq;
+    private static String lastSample;
     private static final Pattern FIELD = Pattern.compile("\"([^\"]+)\"\\s*:\\s*\"([^\"]*)\"");
 
     private BodyEvolutionBiometria() {
@@ -46,12 +53,105 @@ public final class BodyEvolutionBiometria {
     public static void main(String[] args) throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", PORT), 0);
         server.createContext("/health", exchange -> respond(exchange, 200, health()));
-        server.createContext("/capture", exchange -> handle(exchange, BodyEvolutionBiometria::capture));
-        server.createContext("/enroll", exchange -> handle(exchange, BodyEvolutionBiometria::enroll));
+        server.createContext("/capture", exchange -> handle(exchange, body -> exclusive(BodyEvolutionBiometria::capture, body)));
+        server.createContext("/enroll", exchange -> handle(exchange, body -> exclusive(BodyEvolutionBiometria::enroll, body)));
         server.createContext("/verify", exchange -> handle(exchange, BodyEvolutionBiometria::verify));
+        server.createContext("/poll", exchange -> respond(exchange, 200, poll(exchange.getRequestURI().getRawQuery())));
         server.setExecutor(java.util.concurrent.Executors.newFixedThreadPool(4));
         server.start();
+        startListener();
         System.out.println("Body Evolution biometric bridge listening on http://127.0.0.1:" + PORT);
+    }
+
+    private static void startListener() {
+        Thread thread = new Thread(() -> {
+            while (listener == null) {
+                try {
+                    if (DPFPGlobal.getReadersFactory().getReaders().isEmpty()) {
+                        throw new IllegalStateException("Sin lector conectado.");
+                    }
+                    DPFPCapture capture = DPFPGlobal.getCaptureFactory().createCapture();
+                    capture.setPriority(DPFPCapturePriority.CAPTURE_PRIORITY_LOW);
+                    capture.addDataListener(new DPFPDataAdapter() {
+                        @Override
+                        public void dataAcquired(DPFPDataEvent event) {
+                            if (listenerPaused || System.currentTimeMillis() < ignoreUntil) {
+                                return;
+                            }
+                            String encoded = encode(event.getSample().serialize());
+                            synchronized (STATE_LOCK) {
+                                lastSample = encoded;
+                                sampleSeq++;
+                            }
+                        }
+                    });
+                    synchronized (LISTENER_LOCK) {
+                        listener = capture;
+                        if (!listenerPaused) {
+                            capture.startCapture();
+                        }
+                    }
+                    System.out.println("Lectura continua activa.");
+                } catch (Exception | LinkageError exception) {
+                    System.out.println("Lectura continua en espera: " + exception.getMessage());
+                    try {
+                        Thread.sleep(5000);
+                    } catch (InterruptedException interrupted) {
+                        return;
+                    }
+                }
+            }
+        }, "lectura-continua");
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    private static void pauseListener() {
+        synchronized (LISTENER_LOCK) {
+            listenerPaused = true;
+            if (listener != null) {
+                listener.stopCapture();
+            }
+        }
+    }
+
+    private static void resumeListener() {
+        synchronized (LISTENER_LOCK) {
+            ignoreUntil = System.currentTimeMillis() + 1500;
+            listenerPaused = false;
+            if (listener != null) {
+                listener.startCapture();
+            }
+        }
+    }
+
+    private static String exclusive(Handler handler, String body) throws Exception {
+        if (!CAPTURE_LOCK.tryLock()) {
+            throw new IllegalStateException("El lector está ocupado con otra captura.");
+        }
+        try {
+            pauseListener();
+            return handler.handle(body);
+        } finally {
+            resumeListener();
+            CAPTURE_LOCK.unlock();
+        }
+    }
+
+    private static String poll(String query) {
+        long after = -1;
+        if (query != null) {
+            Matcher matcher = Pattern.compile("(?:^|&)after=(\\d+)").matcher(query);
+            if (matcher.find()) {
+                after = Long.parseLong(matcher.group(1));
+            }
+        }
+        synchronized (STATE_LOCK) {
+            if (after >= 0 && sampleSeq > after && lastSample != null) {
+                return "{\"seq\":" + sampleSeq + ",\"sample\":\"" + lastSample + "\"}";
+            }
+            return "{\"seq\":" + sampleSeq + "}";
+        }
     }
 
     private static String health() {
@@ -191,7 +291,7 @@ public final class BodyEvolutionBiometria {
         Matcher matcher = FIELD.matcher(body);
         while (matcher.find()) {
             if (matcher.group(1).equals(name)) {
-                return matcher.group(2);
+                return matcher.group(2).replace("\\/", "/");
             }
         }
         throw new IllegalArgumentException("Falta el campo: " + name);
