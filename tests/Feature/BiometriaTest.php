@@ -18,7 +18,7 @@ test('resuelve el adaptador DigitalPersona desde el contenedor', function () {
 
 test('registra una plantilla biométrica para un cliente', function () {
     Http::fake([
-        'http://127.0.0.1:8765/enroll' => Http::response([
+        'http://127.0.0.1:8765/enrolar' => Http::response([
             'template' => base64_encode('plantilla-digitalpersona'),
         ]),
     ]);
@@ -51,7 +51,7 @@ test('registra una plantilla biométrica para un cliente', function () {
 
 test('identifica un cliente con una muestra biométrica', function () {
     Http::fake([
-        'http://127.0.0.1:8765/verify' => Http::response(['matched' => true]),
+        'http://127.0.0.1:8765/verificar' => Http::response(['matched' => true]),
     ]);
 
     $cliente = Cliente::create([
@@ -84,7 +84,7 @@ test('identifica un cliente con una muestra biométrica', function () {
 
 test('actualizar la huella desactiva la credencial anterior', function () {
     Http::fake([
-        'http://127.0.0.1:8765/enroll' => Http::sequence()
+        'http://127.0.0.1:8765/enrolar' => Http::sequence()
             ->push(['template' => base64_encode('primera-huella')])
             ->push(['template' => base64_encode('segunda-huella')]),
     ]);
@@ -114,7 +114,7 @@ test('actualizar la huella desactiva la credencial anterior', function () {
 test('el sondeo continuo identifica al cliente y devuelve su membresía', function () {
     Http::fake([
         'http://127.0.0.1:8765/poll*' => Http::response(['seq' => 4, 'sample' => base64_encode('muestra')]),
-        'http://127.0.0.1:8765/verify' => Http::response(['matched' => true]),
+        'http://127.0.0.1:8765/verificar' => Http::response(['matched' => true]),
     ]);
 
     $cliente = Cliente::create(['nombre' => 'Ana', 'apellido' => 'Gómez', 'email' => 'ana.scan@example.com']);
@@ -162,7 +162,7 @@ test('devuelve 503 claro cuando el puente biométrico está apagado', function (
 
 test('devuelve 422 con el mensaje del lector cuando la captura falla', function () {
     Http::fake([
-        'http://127.0.0.1:8765/capture' => Http::response(['error' => 'El lector está ocupado con otra captura.'], 422),
+        'http://127.0.0.1:8765/capturar' => Http::response(['error' => 'El lector está ocupado con otra captura.'], 422),
     ]);
 
     $usuario = Usuario::create([

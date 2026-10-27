@@ -18,7 +18,7 @@ class VerificadorBiometricoSdk implements VerificadorBiometrico
             ->get();
 
         foreach ($credenciales as $credencial) {
-            $resultado = $this->solicitar('/verify', [
+            $resultado = $this->solicitar('/verificar', [
                 'sample' => $captureToken,
                 'template' => $credencial->plantilla,
                 'terminal' => $terminalIdentifier,
@@ -38,7 +38,7 @@ class VerificadorBiometricoSdk implements VerificadorBiometrico
 
     public function capturar(string $terminalIdentifier): string
     {
-        $resultado = $this->solicitar('/capture', ['terminal' => $terminalIdentifier]);
+        $resultado = $this->solicitar('/capturar', ['terminal' => $terminalIdentifier]);
 
         if (! is_string($resultado['sample'] ?? null) || $resultado['sample'] === '') {
             throw new BiometriaException('El puente biométrico no devolvió una muestra válida.');
@@ -60,7 +60,7 @@ class VerificadorBiometricoSdk implements VerificadorBiometrico
     public function enrolar(Cliente $cliente, string $terminalIdentifier): array
     {
         $resultado = $this->solicitar(
-            '/enroll',
+            '/enrolar',
             ['terminal' => $terminalIdentifier],
             (int) config('biometria.enroll_timeout'),
         );

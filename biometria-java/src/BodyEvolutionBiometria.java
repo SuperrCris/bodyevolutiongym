@@ -41,7 +41,7 @@ public final class BodyEvolutionBiometria {
     private static final Object LISTENER_LOCK = new Object();
     private static final Object STATE_LOCK = new Object();
     private static volatile DPFPCapture listener;
-    private static volatile boolean listenerPaused;
+    private static volatile boolean escuchando;
     private static volatile long ignoreUntil;
     private static long sampleSeq;
     private static String lastSample;
@@ -52,15 +52,15 @@ public final class BodyEvolutionBiometria {
 
     public static void main(String[] args) throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", PORT), 0);
-        server.createContext("/health", exchange -> respond(exchange, 200, health()));
-        server.createContext("/capture", exchange -> handle(exchange, body -> exclusive(BodyEvolutionBiometria::capture, body)));
-        server.createContext("/enroll", exchange -> handle(exchange, body -> exclusive(BodyEvolutionBiometria::enroll, body)));
-        server.createContext("/verify", exchange -> handle(exchange, BodyEvolutionBiometria::verify));
+        server.createContext("/salud", exchange -> respond(exchange, 200, salud()));
+        server.createContext("/capturar", exchange -> handle(exchange, body -> exclusive(BodyEvolutionBiometria::capturar, body)));
+        server.createContext("/enrolar", exchange -> handle(exchange, body -> exclusive(BodyEvolutionBiometria::enrolar, body)));
+        server.createContext("/verificar", exchange -> handle(exchange, BodyEvolutionBiometria::verificar));
         server.createContext("/poll", exchange -> respond(exchange, 200, poll(exchange.getRequestURI().getRawQuery())));
         server.setExecutor(java.util.concurrent.Executors.newFixedThreadPool(4));
         server.start();
         startListener();
-        System.out.println("Body Evolution biometric bridge listening on http://127.0.0.1:" + PORT);
+        System.out.println("Puente del lector activo en http://127.0.0.1:" + PORT);
     }
 
     private static void startListener() {
@@ -75,7 +75,7 @@ public final class BodyEvolutionBiometria {
                     capture.addDataListener(new DPFPDataAdapter() {
                         @Override
                         public void dataAcquired(DPFPDataEvent event) {
-                            if (listenerPaused || System.currentTimeMillis() < ignoreUntil) {
+                            if (!escuchando || System.currentTimeMillis() < ignoreUntil) {
                                 return;
                             }
                             String encoded = encode(event.getSample().serialize());
@@ -87,7 +87,7 @@ public final class BodyEvolutionBiometria {
                     });
                     synchronized (LISTENER_LOCK) {
                         listener = capture;
-                        if (!listenerPaused) {
+                        if (escuchando) {
                             capture.startCapture();
                         }
                     }
@@ -106,19 +106,19 @@ public final class BodyEvolutionBiometria {
         thread.start();
     }
 
-    private static void pauseListener() {
+    private static void pausarEscuchador() {
         synchronized (LISTENER_LOCK) {
-            listenerPaused = true;
+            escuchando = false;
             if (listener != null) {
                 listener.stopCapture();
             }
         }
     }
 
-    private static void resumeListener() {
+    private static void continuarEscuchador() {
         synchronized (LISTENER_LOCK) {
             ignoreUntil = System.currentTimeMillis() + 1500;
-            listenerPaused = false;
+            escuchando = true;
             if (listener != null) {
                 listener.startCapture();
             }
@@ -130,10 +130,10 @@ public final class BodyEvolutionBiometria {
             throw new IllegalStateException("El lector está ocupado con otra captura.");
         }
         try {
-            pauseListener();
+            pausarEscuchador();
             return handler.handle(body);
         } finally {
-            resumeListener();
+            continuarEscuchador();
             CAPTURE_LOCK.unlock();
         }
     }
@@ -154,7 +154,7 @@ public final class BodyEvolutionBiometria {
         }
     }
 
-    private static String health() {
+    private static String salud() {
         try {
             StringBuilder readers = new StringBuilder();
             for (DPFPReaderDescription reader : DPFPGlobal.getReadersFactory().getReaders()) {
@@ -171,12 +171,12 @@ public final class BodyEvolutionBiometria {
         }
     }
 
-    private static String capture(String body) throws Exception {
+    private static String capturar(String body) throws Exception {
         String terminal = field(body, "terminal");
         return "{\"sample\":\"" + captureSample(terminal) + "\"}";
     }
 
-    private static String enroll(String body) throws Exception {
+    private static String enrolar(String body) throws Exception {
         String terminal = field(body, "terminal");
         DPFPEnrollment enrollment = DPFPGlobal.getEnrollmentFactory().createEnrollment();
         DPFPFeatureExtraction extraction = DPFPGlobal.getFeatureExtractionFactory().createFeatureExtraction();
@@ -202,7 +202,7 @@ public final class BodyEvolutionBiometria {
         return "{\"template\":\"" + encode(template.serialize()) + "\"}";
     }
 
-    private static String verify(String body) throws Exception {
+    private static String verificar(String body) throws Exception {
         byte[] sampleBytes = decode(field(body, "sample"));
         byte[] templateBytes = decode(field(body, "template"));
         DPFPSample sample = DPFPGlobal.getSampleFactory().createSample(sampleBytes);

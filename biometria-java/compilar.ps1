@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Stop'
 
-$java = 'C:\Program Files\Java\jdk-21\bin'
+$java = Join-Path $env:USERPROFILE '.local\java\jdk-21.0.12.1+1\bin'
 $sdk = 'C:\Program Files\DigitalPersona\Bin\Java'
 $build = Join-Path $PSScriptRoot 'build'
 

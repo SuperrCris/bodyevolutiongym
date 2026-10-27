@@ -10,7 +10,7 @@ use Illuminate\Http\Request;
 
 class BiometricController extends Controller
 {
-    public function verify(Request $request, VerificadorBiometrico $verifier): JsonResponse
+    public function verificar(Request $request, VerificadorBiometrico $verifier): JsonResponse
     {
         $data = $request->validate([
             'capture_token' => ['required', 'string', 'max:1048576'],
@@ -53,7 +53,7 @@ class BiometricController extends Controller
         return response()->json($respuesta);
     }
 
-    public function capture(Request $request, VerificadorBiometrico $verifier): JsonResponse
+    public function capturar(Request $request, VerificadorBiometrico $verifier): JsonResponse
     {
         $data = $request->validate([
             'terminal_identifier' => ['nullable', 'string', 'max:100'],
@@ -66,7 +66,7 @@ class BiometricController extends Controller
         ]);
     }
 
-    public function enroll(Request $request, Cliente $cliente, VerificadorBiometrico $verifier): JsonResponse
+    public function enrolar(Request $request, Cliente $cliente, VerificadorBiometrico $verifier): JsonResponse
     {
         $data = $request->validate([
             'terminal_identifier' => ['nullable', 'string', 'max:100'],

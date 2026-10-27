@@ -14,7 +14,7 @@
             <div class="mx-auto flex max-w-7xl items-center justify-between gap-6 px-6 py-5">
                 <a href="{{ route('clientes.index') }}" class="flex items-center gap-3">
                     <img src="{{ asset('images/logo.png') }}" alt="Body Evolution Gym" class="h-12 w-auto">
-                    
+                </a>
                 <div class="flex items-center gap-4">
                     <span class="hidden text-sm text-slate-300 sm:block">{{ auth()->user()->name }}</span>
                     <form method="POST" action="{{ route('logout') }}">

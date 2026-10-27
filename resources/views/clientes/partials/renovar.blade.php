@@ -1,6 +1,6 @@
 <div id="renovar-{{ $cliente->id }}" data-modal class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/80 p-6 backdrop-blur-sm">
     <div class="w-full max-w-lg rounded-3xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
-        <div class="flex items-center justify-between"><h2 class="text-xl font-bold">Renovar membresía</h2><button data-close-modal class="text-2xl text-slate-500 hover:text-white">×</button></div>
+        <div class="flex items-center justify-between"><h2 class="text-xl font-bold">Renovar membresía</h2><button type="button" data-close-modal class="text-2xl text-slate-500 hover:text-white">×</button></div>
         <form method="POST" action="{{ route('clientes.renew', $cliente) }}" class="mt-6 space-y-4">
             @csrf
             <label class="block"><span class="mb-1.5 block text-sm font-semibold text-slate-300">Plan</span><select name="tipo_membresia_id" required class="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-3 text-sm outline-none focus:border-teal-300/60"><option value="">Selecciona un plan</option>@foreach ($planes as $plan)<option value="{{ $plan->id }}">{{ $plan->nombre }} · {{ $plan->duracion_dias }} días · ${{ number_format($plan->precio, 2) }}</option>@endforeach</select></label>

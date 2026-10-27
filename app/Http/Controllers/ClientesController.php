@@ -5,9 +5,14 @@ namespace App\Http\Controllers;
 use App\Domain\Membresias\MembresiasServicio;
 use App\Models\Cliente;
 use App\Models\TipoMembresia;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -21,12 +26,7 @@ class ClientesController extends Controller
                 'credencialesBiometricas' => fn ($query) => $query->where('estado', true),
             ])
             ->when($request->filled('buscar'), function ($query) use ($request): void {
-                $termino = $request->string('buscar')->toString();
-                $query->where(function ($query) use ($termino): void {
-                    $query->where('nombre', 'like', "%{$termino}%")
-                        ->orWhere('apellido', 'like', "%{$termino}%")
-                        ->orWhere('documento', 'like', "%{$termino}%");
-                });
+                $this->applyClientSearch($query, $request->string('buscar')->toString());
             })
             ->latest()
             ->paginate(12)
@@ -40,14 +40,37 @@ class ClientesController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        Cliente::create($this->validatedData($request));
+        $data = $this->validatedData($request);
+        $foto = $request->file('foto');
+
+        if ($foto !== null) {
+            $data['foto'] = $this->storePhoto($foto);
+        } else {
+            unset($data['foto']);
+        }
+
+        Cliente::create($data);
 
         return to_route('clientes.index')->with('success', 'Cliente creado correctamente.');
     }
 
     public function update(Request $request, Cliente $cliente): RedirectResponse
     {
-        $cliente->update($this->validatedData($request, $cliente));
+        $data = $this->validatedData($request, $cliente);
+        $fotoAnterior = $cliente->foto;
+        $foto = $request->file('foto');
+
+        if ($foto !== null) {
+            $data['foto'] = $this->storePhoto($foto);
+        } else {
+            unset($data['foto']);
+        }
+
+        $cliente->update($data);
+
+        if ($foto !== null && $fotoAnterior !== null) {
+            Storage::disk('public')->delete($fotoAnterior);
+        }
 
         return to_route('clientes.index')->with('success', 'Cliente actualizado correctamente.');
     }
@@ -118,6 +141,54 @@ class ClientesController extends Controller
                 Rule::unique('clientes', 'documento')->ignore($cliente?->id),
             ],
             'fecha_nacimiento' => ['nullable', 'date'],
+            'foto' => [
+                'nullable',
+                'image',
+                'mimes:jpeg,jpg,png,webp',
+                'max:5120',
+                'dimensions:max_width=2000,max_height=2000',
+            ],
         ]);
+    }
+
+    private function storePhoto(UploadedFile $foto): string
+    {
+        $path = $foto->store('clientes', 'public');
+
+        if ($path === false) {
+            throw new \RuntimeException('No fue posible guardar la foto del cliente.');
+        }
+
+        return $path;
+    }
+
+    private function applyClientSearch(Builder $query, string $search): void
+    {
+        $term = Str::lower(trim($search));
+        $likeTerm = "%{$term}%";
+
+        $query->where(function (Builder $query) use ($term, $likeTerm): void {
+            $query->whereRaw('LOWER(nombre) LIKE ?', [$likeTerm])
+                ->orWhereRaw('LOWER(apellido) LIKE ?', [$likeTerm])
+                ->orWhereRaw('LOWER(documento) LIKE ?', [$likeTerm]);
+
+            if (DB::connection()->getDriverName() !== 'pgsql' || Str::length($term) < 3) {
+                return;
+            }
+
+            $threshold = $this->similarityThreshold($term);
+            $query->orWhereRaw('word_similarity(?, LOWER(nombre)) >= ?', [$term, $threshold])
+                ->orWhereRaw('word_similarity(?, LOWER(apellido)) >= ?', [$term, $threshold])
+                ->orWhereRaw('word_similarity(?, LOWER(documento)) >= ?', [$term, $threshold]);
+        });
+    }
+
+    private function similarityThreshold(string $term): float
+    {
+        return match (true) {
+            Str::length($term) <= 4 => 0.25,
+            Str::contains($term, ' ') => 0.4,
+            default => 0.45,
+        };
     }
 }

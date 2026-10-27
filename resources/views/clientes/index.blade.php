@@ -46,7 +46,11 @@
             <article class="rounded-3xl border border-white/10 bg-white/[0.045] p-5 transition hover:border-teal-300/30">
                 <div class="flex items-start justify-between gap-4">
                     <div class="flex items-center gap-4">
-                        <div class="grid size-12 place-items-center rounded-2xl bg-slate-800 text-lg font-black text-teal-300">{{ strtoupper(substr($cliente->nombre, 0, 1).substr($cliente->apellido, 0, 1)) }}</div>
+                        @if ($cliente->foto)
+                            <img src="{{ asset('storage/'.$cliente->foto) }}" alt="Foto de {{ $cliente->nombre }} {{ $cliente->apellido }}" class="size-12 rounded-2xl object-cover">
+                        @else
+                            <div class="grid size-12 place-items-center rounded-2xl bg-slate-800 text-lg font-black text-teal-300">{{ strtoupper(substr($cliente->nombre, 0, 1).substr($cliente->apellido, 0, 1)) }}</div>
+                        @endif
                         <div>
                             <h2 class="font-bold">{{ $cliente->nombre }} {{ $cliente->apellido }}</h2>
                             <p class="mt-1 text-sm text-slate-400">{{ $cliente->documento ?: 'Sin documento' }} · {{ $cliente->telefono ?: 'Sin teléfono' }}</p>
@@ -82,8 +86,26 @@
 
 <div id="crearCliente" data-modal class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/80 p-6 backdrop-blur-sm">
     <div class="w-full max-w-lg rounded-3xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
-        <div class="flex items-center justify-between"><h2 class="text-xl font-bold">Nuevo cliente</h2><button data-close-modal class="text-2xl text-slate-500 hover:text-white">×</button></div>
+        <div class="flex items-center justify-between"><h2 class="text-xl font-bold">Nuevo cliente</h2><button type="button" data-close-modal class="text-2xl text-slate-500 hover:text-white">×</button></div>
         @include('clientes.partials.formulario', ['action' => route('clientes.store'), 'method' => 'POST', 'cliente' => null])
+    </div>
+</div>
+
+<div id="camaraCliente" data-camera-modal class="fixed inset-0 z-[60] hidden items-center justify-center bg-slate-950/90 p-6 backdrop-blur-sm">
+    <div class="w-full max-w-2xl rounded-3xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
+        <div class="flex items-center justify-between gap-4">
+            <div>
+                <h2 class="text-xl font-bold">Capturar foto</h2>
+                <p class="mt-1 text-sm text-slate-400">Acomoda el rostro dentro del encuadre y presiona capturar.</p>
+            </div>
+            <button type="button" data-close-camera class="text-2xl text-slate-500 hover:text-white" aria-label="Cerrar cámara">×</button>
+        </div>
+        <video data-camera-video class="mt-5 aspect-video w-full rounded-2xl bg-black object-cover" autoplay playsinline></video>
+        <canvas data-camera-canvas class="hidden"></canvas>
+        <div class="mt-5 flex justify-end gap-3">
+            <button type="button" data-close-camera class="rounded-xl border border-white/10 px-4 py-3 font-semibold text-slate-300 hover:border-white/30">Cancelar</button>
+            <button type="button" data-capture-photo class="rounded-xl bg-teal-300 px-5 py-3 font-bold text-slate-950 hover:bg-teal-200">Capturar foto</button>
+        </div>
     </div>
 </div>
 @endsection
@@ -98,6 +120,75 @@
     document.querySelectorAll('[data-close-modal]').forEach((button) => button.addEventListener('click', () => {
         const modal = button.closest('[data-modal]'); modal.classList.add('hidden'); modal.classList.remove('flex');
     }));
+    document.querySelectorAll('[data-foto-input]').forEach((input) => input.addEventListener('change', () => {
+        const preview = input.closest('form').querySelector('[data-foto-preview]');
+        const file = input.files?.[0];
+        if (!file) return;
+        preview.src = URL.createObjectURL(file);
+        preview.classList.remove('hidden');
+    }));
+    const cameraModal = document.querySelector('[data-camera-modal]');
+    const cameraVideo = cameraModal?.querySelector('[data-camera-video]');
+    const cameraCanvas = cameraModal?.querySelector('[data-camera-canvas]');
+    let cameraStream = null;
+    let cameraInput = null;
+
+    function stopCamera() {
+        cameraStream?.getTracks().forEach((track) => track.stop());
+        cameraStream = null;
+        if (cameraVideo) cameraVideo.srcObject = null;
+        cameraInput = null;
+        cameraModal?.classList.add('hidden');
+        cameraModal?.classList.remove('flex');
+    }
+
+    document.querySelectorAll('[data-open-camera]').forEach((button) => button.addEventListener('click', async () => {
+        cameraInput = button.closest('form')?.querySelector('[data-foto-input]');
+        if (!cameraInput || !cameraModal || !cameraVideo || !cameraCanvas) return;
+
+        if (!navigator.mediaDevices?.getUserMedia) {
+            window.alert('Este navegador no permite acceder a la cámara. Puedes seleccionar una imagen.');
+            return;
+        }
+
+        try {
+            cameraStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'user' },
+                audio: false,
+            });
+            cameraVideo.srcObject = cameraStream;
+            cameraModal.classList.remove('hidden');
+            cameraModal.classList.add('flex');
+        } catch (error) {
+            stopCamera();
+            window.alert('No fue posible activar la cámara. Verifica el permiso del navegador y que no esté siendo usada por otra aplicación.');
+        }
+    }));
+
+    cameraModal?.querySelectorAll('[data-close-camera]').forEach((button) => button.addEventListener('click', stopCamera));
+    cameraModal?.querySelector('[data-capture-photo]')?.addEventListener('click', () => {
+        if (!cameraInput || !cameraVideo || !cameraCanvas || cameraVideo.videoWidth === 0) {
+            window.alert('La cámara todavía no está lista. Espera un momento e inténtalo de nuevo.');
+            return;
+        }
+
+        cameraCanvas.width = cameraVideo.videoWidth;
+        cameraCanvas.height = cameraVideo.videoHeight;
+        cameraCanvas.getContext('2d').drawImage(cameraVideo, 0, 0);
+        cameraCanvas.toBlob((blob) => {
+            if (!blob || !cameraInput) {
+                window.alert('No fue posible capturar la imagen.');
+                return;
+            }
+
+            const archivo = new File([blob], `cliente-${Date.now()}.jpg`, { type: 'image/jpeg' });
+            const archivos = new DataTransfer();
+            archivos.items.add(archivo);
+            cameraInput.files = archivos.files;
+            cameraInput.dispatchEvent(new Event('change', { bubbles: true }));
+            stopCamera();
+        }, 'image/jpeg', 0.9);
+    });
     setTimeout(() => document.querySelector('[data-toast]')?.remove(), 5000);
     async function actualizarResumen() {
         const response = await fetch('{{ route('clientes.resumen') }}', { headers: { 'Accept': 'application/json' } });
