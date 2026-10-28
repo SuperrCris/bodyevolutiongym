@@ -32,14 +32,28 @@ class ClientesController extends Controller
             ->paginate(12)
             ->withQueryString();
 
+        $clienteParaEnrolar = null;
+        $clienteIdParaEnrolar = $request->session()->pull('cliente_para_enrolar');
+
+        if ($clienteIdParaEnrolar !== null) {
+            $clienteParaEnrolar = Cliente::query()
+                ->with(['credencialesBiometricas' => fn ($query) => $query->where('estado', true)])
+                ->findOrFail($clienteIdParaEnrolar);
+        }
+
         return view('clientes.index', [
             'clientes' => $clientes,
+            'clienteParaEnrolar' => $clienteParaEnrolar,
             'planes' => TipoMembresia::query()->where('activo', true)->orderBy('duracion_dias')->get(),
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
+        $request->validate([
+            'registrar_huella_despues' => ['sometimes', 'boolean'],
+        ]);
+        $registrarHuellaDespues = $request->boolean('registrar_huella_despues');
         $data = $this->validatedData($request);
         $foto = $request->file('foto');
 
@@ -49,9 +63,14 @@ class ClientesController extends Controller
             unset($data['foto']);
         }
 
-        Cliente::create($data);
+        $cliente = Cliente::create($data);
+        $redirect = to_route('clientes.index')->with('success', 'Cliente creado correctamente.');
 
-        return to_route('clientes.index')->with('success', 'Cliente creado correctamente.');
+        if ($registrarHuellaDespues) {
+            $redirect->with('cliente_para_enrolar', $cliente->id);
+        }
+
+        return $redirect;
     }
 
     public function update(Request $request, Cliente $cliente): RedirectResponse

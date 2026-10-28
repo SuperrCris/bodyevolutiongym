@@ -8,7 +8,7 @@
         <div>
             <p class="text-sm font-semibold uppercase tracking-[0.25em] text-teal-300">Centro de control</p>
             <h1 class="mt-2 text-4xl font-black tracking-tight sm:text-5xl">Clientes</h1>
-            <p class="mt-3 max-w-2xl text-slate-400">Gestiona altas, ediciones y renovaciones sin abandonar tu flujo de trabajo.</p>
+
         </div>
         <div class="flex flex-wrap gap-3">
             <button type="button" data-verificar-huella class="rounded-2xl border border-teal-300/40 px-5 py-3 font-bold text-teal-200 transition hover:border-teal-200 hover:text-teal-100">Verificar huella</button>
@@ -39,46 +39,78 @@
         </form>
     </div>
 
-    <div class="grid gap-4 lg:grid-cols-2">
+    <div class="grid gap-2">
         @forelse ($clientes as $cliente)
             @php($membresia = $cliente->membresias->first())
             @php($tieneHuella = $cliente->credencialesBiometricas->isNotEmpty())
-            <article class="rounded-3xl border border-white/10 bg-white/[0.045] p-5 transition hover:border-teal-300/30">
-                <div class="flex items-start justify-between gap-4">
-                    <div class="flex items-center gap-4">
+            <article class="@container rounded-2xl border border-white/10 bg-white/[0.045] p-3 transition hover:border-teal-300/30">
+                <div class="grid gap-3 @2xl:grid-cols-[minmax(14rem,1fr)_minmax(16rem,1.2fr)_auto] @2xl:items-center @2xl:gap-4">
+                    <div class="flex min-w-0 items-center gap-2">
                         @if ($cliente->foto)
-                            <img src="{{ asset('storage/'.$cliente->foto) }}" alt="Foto de {{ $cliente->nombre }} {{ $cliente->apellido }}" class="size-12 rounded-2xl object-cover">
+                            <img src="{{ asset('storage/'.$cliente->foto) }}" alt="Foto de {{ $cliente->nombre }} {{ $cliente->apellido }}" class="size-9 shrink-0 rounded-xl object-cover">
                         @else
-                            <div class="grid size-12 place-items-center rounded-2xl bg-slate-800 text-lg font-black text-teal-300">{{ strtoupper(substr($cliente->nombre, 0, 1).substr($cliente->apellido, 0, 1)) }}</div>
+                            <div class="grid size-9 shrink-0 place-items-center rounded-xl bg-slate-800 text-base font-black text-teal-300">{{ strtoupper(substr($cliente->nombre, 0, 1).substr($cliente->apellido, 0, 1)) }}</div>
                         @endif
-                        <div>
-                            <h2 class="font-bold">{{ $cliente->nombre }} {{ $cliente->apellido }}</h2>
-                            <p class="mt-1 text-sm text-slate-400">{{ $cliente->documento ?: 'Sin documento' }} · {{ $cliente->telefono ?: 'Sin teléfono' }}</p>
+                        <div class="min-w-0 flex-1">
+                            <div class="flex min-w-0 items-center gap-2">
+                                <h2 class="min-w-0 flex-1 truncate text-sm font-bold" title="{{ $cliente->nombre }} {{ $cliente->apellido }}">{{ $cliente->nombre }} {{ $cliente->apellido }}</h2>
+                                <span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold {{ $membresia?->estaActiva() ? 'bg-teal-300/15 text-teal-200' : 'bg-amber-300/15 text-amber-200' }}">{{ $membresia?->estaActiva() ? 'Activo' : 'Sin plan activo' }}</span>
+                            </div>
+                            <p class="truncate text-xs text-slate-400" title="{{ $cliente->telefono ?: 'Sin teléfono' }}">{{ $cliente->telefono ?: 'Sin teléfono' }}</p>
                         </div>
                     </div>
-                    <span class="rounded-full px-3 py-1 text-xs font-semibold {{ $membresia?->estaActiva() ? 'bg-teal-300/15 text-teal-200' : 'bg-amber-300/15 text-amber-200' }}">{{ $membresia?->estaActiva() ? 'Activo' : 'Sin plan activo' }}</span>
-                </div>
-                <div class="mt-5 grid gap-3 rounded-2xl bg-slate-950/50 p-4 text-sm sm:grid-cols-2">
-                    <div><p class="text-slate-500">Plan actual</p><p class="mt-1 font-semibold">{{ $membresia?->plan?->nombre ?: '—' }}</p></div>
-                    <div><p class="text-slate-500">Vigencia</p><p class="mt-1 font-semibold">{{ $membresia?->finalizacion?->format('d/m/Y') ?: '—' }}</p></div>
-                </div>
-                <div class="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm">
-                    <div>
-                        <p class="text-slate-500">Huella digital</p>
-                        <p data-huella-estado="{{ $cliente->id }}" class="mt-1 font-semibold {{ $tieneHuella ? 'text-teal-200' : 'text-slate-300' }}">{{ $tieneHuella ? 'Registrada' : 'Sin registrar' }}</p>
+                    <div class="grid grid-cols-2 items-center gap-x-3 gap-y-2 rounded-xl bg-slate-950/50 p-2.5 text-sm @2xl:grid-cols-3">
+                        <div class="min-w-0">
+                            <p class="text-[10px] text-slate-500">Plan actual</p>
+                            <p class="truncate text-xs font-semibold" title="{{ $membresia?->plan?->nombre ?: '—' }}">{{ $membresia?->plan?->nombre ?: '—' }}</p>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-[10px] text-slate-500">Vigencia</p>
+                            <p class="text-xs font-semibold">{{ $membresia?->finalizacion?->format('d/m/Y') ?: '—' }}</p>
+                        </div>
+                        <div class="col-span-2 flex items-center justify-between gap-2 border-t border-white/10 pt-2 @2xl:col-span-1 @2xl:border-t-0 @2xl:pt-0">
+                            <div class="flex min-w-0 items-center gap-2">
+                                <span data-huella-indicador="{{ $cliente->id }}" class="relative grid size-6 shrink-0 place-items-center">
+                                    <svg class="size-5 text-slate-300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                        <path d="M5 11a7 7 0 0 1 14 0v2M7.5 10.5a4.5 4.5 0 0 1 9 0v3M10 10.5a2 2 0 0 1 4 0v4a8 8 0 0 1-1.25 4.3M12 12v3a10 10 0 0 1-1.5 5.5M9 13v1a5 5 0 0 1-.75 2.5M17 13v1.5a12 12 0 0 1-1 4" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" />
+                                    </svg>
+                                    <span class="absolute -bottom-0.5 -right-0.5 grid size-3.5 place-items-center rounded-full bg-slate-900">
+                                        <svg data-huella-check class="{{ $tieneHuella ? '' : 'hidden' }} size-2.5 text-teal-300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                                            <path d="m4.5 10.5 3.75 3.75L15.75 6.75" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
+                                        </svg>
+                                        <svg data-huella-cross class="{{ $tieneHuella ? 'hidden' : '' }} size-2.5 text-rose-300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                                            <path d="m6 6 8 8m0-8-8 8" stroke="currentColor" stroke-linecap="round" stroke-width="2" />
+                                        </svg>
+                                    </span>
+                                </span>
+                                <span data-huella-estado="{{ $cliente->id }}" class="truncate text-xs font-semibold {{ $tieneHuella ? 'text-teal-200' : 'text-slate-300' }}">{{ $tieneHuella ? 'Registrada' : 'Sin registrar' }}</span>
+                            </div>
+                        </div>
                     </div>
-                    <span data-huella-indicador="{{ $cliente->id }}" class="size-3 rounded-full {{ $tieneHuella ? 'bg-teal-300' : 'bg-slate-600' }}"></span>
-                </div>
-                <div class="mt-5 flex flex-wrap gap-2">
-                    <button type="button" data-open-modal="editar-{{ $cliente->id }}" class="rounded-xl border border-white/10 px-3 py-2 text-sm font-semibold text-slate-300 hover:border-teal-300/50 hover:text-teal-200">Editar</button>
-                    <button type="button" data-open-modal="renovar-{{ $cliente->id }}" class="rounded-xl bg-teal-300 px-3 py-2 text-sm font-bold text-slate-950 hover:bg-teal-200">Renovar membresía</button>
-                    <button type="button" data-enrolar-huella="{{ $cliente->id }}" class="rounded-xl border border-indigo-300/40 px-3 py-2 text-sm font-semibold text-indigo-200 hover:border-indigo-200">{{ $tieneHuella ? 'Actualizar huella' : 'Registrar huella' }}</button>
+                    <div class="flex justify-end">
+                        <div class="hidden flex-wrap justify-end gap-1.5 @5xl:flex">
+                            <button type="button" data-open-modal="editar-{{ $cliente->id }}" class="rounded-lg border border-white/10 px-2.5 py-1.5 text-xs font-semibold text-slate-300 hover:border-teal-300/50 hover:text-teal-200">Editar</button>
+                            <button type="button" data-open-modal="renovar-{{ $cliente->id }}" class="rounded-lg bg-teal-300 px-2.5 py-1.5 text-xs font-bold text-slate-950 hover:bg-teal-200">Renovar</button>
+                        </div>
+                        <details class="group relative @5xl:hidden">
+                            <summary class="inline-flex cursor-pointer list-none items-center gap-2 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs font-semibold text-slate-300 hover:border-teal-300/50 hover:text-teal-200">
+                                Acciones
+                                <svg class="size-4 transition group-open:rotate-180" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                    <path fill-rule="evenodd" d="M5.22 7.47a.75.75 0 0 1 1.06 0L10 11.19l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 8.53a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+                                </svg>
+                            </summary>
+                            <div class="absolute right-0 top-full z-20 mt-2 flex min-w-48 flex-col gap-1 rounded-xl border border-white/10 bg-slate-900 p-2 shadow-xl">
+                                <button type="button" data-open-modal="editar-{{ $cliente->id }}" class="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-slate-300 hover:bg-white/5 hover:text-teal-200">Editar</button>
+                                <button type="button" data-open-modal="renovar-{{ $cliente->id }}" class="w-full rounded-lg px-3 py-2 text-left text-sm font-bold text-teal-200 hover:bg-white/5">Renovar membresía</button>
+                            </div>
+                        </details>
+                    </div>
                 </div>
             </article>
             @include('clientes.partials.editar', ['cliente' => $cliente])
-            @include('clientes.partials.renovar', ['cliente' => $cliente, 'planes' => $planes])
+            @include('clientes.partials.renovar', ['cliente' => $cliente, 'planes' => $planes, 'tieneHuella' => $tieneHuella])
         @empty
-            <div class="rounded-3xl border border-dashed border-white/15 p-10 text-center text-slate-400 lg:col-span-2">No hay clientes que coincidan con la búsqueda.</div>
+            <div class="rounded-3xl border border-dashed border-white/15 p-10 text-center text-slate-400">No hay clientes que coincidan con la búsqueda.</div>
         @endforelse
     </div>
     <div>{{ $clientes->links() }}</div>
@@ -88,6 +120,26 @@
     <div class="w-full max-w-lg rounded-3xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
         <div class="flex items-center justify-between"><h2 class="text-xl font-bold">Nuevo cliente</h2><button type="button" data-close-modal class="text-2xl text-slate-500 hover:text-white">×</button></div>
         @include('clientes.partials.formulario', ['action' => route('clientes.store'), 'method' => 'POST', 'cliente' => null])
+    </div>
+</div>
+
+<div
+    id="enrolarHuellaCompartido"
+    data-modal
+    data-enrolamiento-inicial="{{ $clienteParaEnrolar?->id ?? '' }}"
+    data-enrolamiento-nombre="{{ $clienteParaEnrolar ? $clienteParaEnrolar->nombre.' '.$clienteParaEnrolar->apellido : '' }}"
+    data-enrolamiento-tiene-huella="{{ $clienteParaEnrolar && $clienteParaEnrolar->credencialesBiometricas->isNotEmpty() ? 'true' : 'false' }}"
+    class="fixed inset-0 z-[55] {{ $clienteParaEnrolar ? 'flex' : 'hidden' }} items-center justify-center bg-slate-950/80 p-6 backdrop-blur-sm"
+>
+    <div class="w-full max-w-lg rounded-3xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
+        <div class="flex items-center justify-between gap-4">
+            <div>
+                <h2 data-titulo-enrolamiento class="text-xl font-bold">Registrar huella</h2>
+                <p data-nombre-cliente-enrolamiento class="mt-1 text-sm text-slate-400">Cliente: {{ $clienteParaEnrolar ? $clienteParaEnrolar->nombre.' '.$clienteParaEnrolar->apellido : '' }}</p>
+            </div>
+            <button type="button" data-close-modal class="text-2xl text-slate-500 hover:text-white" aria-label="Cerrar">×</button>
+        </div>
+        @include('clientes.partials.enrolar-huella', ['clienteId' => '', 'tieneHuella' => false])
     </div>
 </div>
 
@@ -119,6 +171,33 @@
     }));
     document.querySelectorAll('[data-close-modal]').forEach((button) => button.addEventListener('click', () => {
         const modal = button.closest('[data-modal]'); modal.classList.add('hidden'); modal.classList.remove('flex');
+    }));
+    function abrirModalEnrolamiento(clienteId, nombre, tieneHuella) {
+        const modal = document.getElementById('enrolarHuellaCompartido');
+        const panel = modal.querySelector('[data-progreso-enrolamiento]');
+        const button = panel.querySelector('[data-enrolar-huella]');
+        const label = tieneHuella ? 'Actualizar huella' : 'Registrar huella';
+
+        panel.dataset.progresoEnrolamiento = clienteId;
+        button.dataset.enrolarHuella = clienteId;
+        button.dataset.labelInicial = label;
+        button.disabled = false;
+        button.textContent = label;
+        modal.querySelector('[data-titulo-enrolamiento]').textContent = label;
+        modal.querySelector('[data-nombre-cliente-enrolamiento]').textContent = `Cliente: ${nombre}`;
+        panel.querySelectorAll('[data-paso-enrolamiento]').forEach((circulo) => {
+            circulo.dataset.completed = 'false';
+        });
+        panel.querySelector('[data-mensaje-enrolamiento]').textContent = 'Coloca y levanta el mismo dedo 4 veces.';
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+    document.querySelectorAll('[data-open-enrollment]').forEach((button) => button.addEventListener('click', () => {
+        abrirModalEnrolamiento(
+            button.dataset.openEnrollment,
+            button.dataset.clienteNombre,
+            button.dataset.tieneHuella === 'true',
+        );
     }));
     document.querySelectorAll('[data-foto-input]').forEach((input) => input.addEventListener('change', () => {
         const preview = input.closest('form').querySelector('[data-foto-preview]');
@@ -206,27 +285,86 @@
         if (!response.ok) throw new Error(data.message || data.error || 'No fue posible comunicarse con el lector.');
         return data;
     }
-    document.querySelectorAll('[data-enrolar-huella]').forEach((button) => button.addEventListener('click', async () => {
-        button.disabled = true;
-        button.textContent = 'Coloca el dedo...';
-        try {
-            await solicitarHuella(`/api/v1/customers/${button.dataset.enrolarHuella}/biometrics/enroll`, {
-                method: 'POST',
-                body: JSON.stringify({ terminal_identifier: '' }),
+    function actualizarProgresoEnrolamiento(clienteId, muestras, total) {
+        const pasosCompletados = total > 0 ? Math.min(4, Math.floor((muestras / total) * 4)) : 0;
+        document.querySelectorAll(`[data-progreso-enrolamiento="${clienteId}"]`).forEach((panel) => {
+            panel.querySelectorAll('[data-paso-enrolamiento]').forEach((circulo) => {
+                circulo.dataset.completed = String(Number(circulo.dataset.pasoEnrolamiento) <= pasosCompletados);
             });
-            button.textContent = 'Huella registrada';
-            document.querySelector(`[data-huella-estado="${button.dataset.enrolarHuella}"]`).textContent = 'Registrada';
-            document.querySelector(`[data-huella-estado="${button.dataset.enrolarHuella}"]`).classList.remove('text-slate-300');
-            document.querySelector(`[data-huella-estado="${button.dataset.enrolarHuella}"]`).classList.add('text-teal-200');
-            document.querySelector(`[data-huella-indicador="${button.dataset.enrolarHuella}"]`).classList.remove('bg-slate-600');
-            document.querySelector(`[data-huella-indicador="${button.dataset.enrolarHuella}"]`).classList.add('bg-teal-300');
-            button.classList.add('text-teal-200');
+        });
+    }
+    function mostrarMensajeEnrolamiento(clienteId, mensaje) {
+        document.querySelectorAll(`[data-progreso-enrolamiento="${clienteId}"]`).forEach((panel) => {
+            panel.querySelector('[data-mensaje-enrolamiento]').textContent = mensaje;
+        });
+    }
+    document.addEventListener('click', async (event) => {
+        const button = event.target.closest('[data-enrolar-huella]');
+        if (!button) return;
+        const clienteId = button.dataset.enrolarHuella;
+        const enrollmentButtons = document.querySelectorAll(`[data-enrolar-huella="${clienteId}"]`);
+        enrollmentButtons.forEach((action) => {
+            action.disabled = true;
+            action.textContent = 'Esperando lector...';
+        });
+        actualizarProgresoEnrolamiento(clienteId, 0, 4);
+        mostrarMensajeEnrolamiento(clienteId, 'Coloca el dedo en el lector y retíralo cuando termine cada captura.');
+        try {
+            await solicitarHuella(`/api/v1/customers/${clienteId}/biometrics/enroll/start`, {
+            method: 'POST',
+            body: JSON.stringify({ terminal_identifier: '' }),
+        });
+
+            while (true) {
+                const progreso = await solicitarHuella(`/api/v1/customers/${clienteId}/biometrics/enroll/progress`, {
+                    method: 'GET',
+                });
+                actualizarProgresoEnrolamiento(clienteId, progreso.muestras, progreso.total);
+                mostrarMensajeEnrolamiento(clienteId, progreso.mensaje);
+
+                if (progreso.estado === 'completado') {
+                    break;
+                }
+
+                if (progreso.estado === 'error') {
+                    throw new Error(progreso.error || progreso.mensaje || 'No se pudo registrar la huella.');
+                }
+
+                if (!progreso.en_curso) {
+                    throw new Error('El lector dejó de reportar el enrolamiento. Inténtalo nuevamente.');
+                }
+
+                await new Promise((resolve) => setTimeout(resolve, 350));
+            }
+
+            await solicitarHuella(`/api/v1/customers/${clienteId}/biometrics/enroll/finish`, {
+                method: 'POST',
+                body: JSON.stringify({}),
+            });
+            actualizarProgresoEnrolamiento(clienteId, 4, 4);
+            mostrarMensajeEnrolamiento(clienteId, 'Huella registrada correctamente.');
+            enrollmentButtons.forEach((action) => {
+                action.textContent = 'Huella registrada';
+                action.classList.add('text-teal-200');
+            });
+            document.querySelectorAll(`[data-huella-estado="${clienteId}"]`).forEach((estado) => {
+                estado.textContent = 'Registrada';
+                estado.classList.remove('text-slate-300');
+                estado.classList.add('text-teal-200');
+            });
+            document.querySelectorAll(`[data-huella-indicador="${clienteId}"]`).forEach((indicador) => {
+                indicador.querySelector('[data-huella-check]').classList.remove('hidden');
+                indicador.querySelector('[data-huella-cross]').classList.add('hidden');
+            });
         } catch (error) {
-            button.disabled = false;
-            button.textContent = 'Registrar huella';
+            enrollmentButtons.forEach((action) => {
+                action.disabled = false;
+                action.textContent = action.dataset.labelInicial;
+            });
+            mostrarMensajeEnrolamiento(clienteId, error.message);
             window.alert(error.message);
         }
-    }));
+    });
     document.querySelector('[data-verificar-huella]')?.addEventListener('click', async (event) => {
         const button = event.currentTarget;
         button.disabled = true;
@@ -248,6 +386,14 @@
             button.textContent = 'Verificar huella';
         }
     });
+    const modalEnrolamiento = document.getElementById('enrolarHuellaCompartido');
+    if (modalEnrolamiento.dataset.enrolamientoInicial) {
+        abrirModalEnrolamiento(
+            modalEnrolamiento.dataset.enrolamientoInicial,
+            modalEnrolamiento.dataset.enrolamientoNombre,
+            modalEnrolamiento.dataset.enrolamientoTieneHuella === 'true',
+        );
+    }
     actualizarResumen();
     setInterval(actualizarResumen, 15000);
 </script>

@@ -18,5 +18,8 @@
             <img data-foto-preview src="{{ $cliente?->foto ? asset('storage/'.$cliente->foto) : '' }}" alt="Vista previa de la foto del cliente" class="{{ $cliente?->foto ? '' : 'hidden' }} mt-3 h-24 w-24 rounded-2xl object-cover ring-1 ring-white/10">
         </label>
     </div>
-    <button class="w-full rounded-xl bg-teal-300 px-4 py-3 font-bold text-slate-950 hover:bg-teal-200">Guardar cliente</button>
+    @if ($cliente === null)
+        <button type="submit" name="registrar_huella_despues" value="1" class="w-full rounded-xl border border-indigo-300/40 px-4 py-3 font-bold text-indigo-200 hover:border-indigo-200 hover:bg-indigo-300/10">Guardar y registrar huella</button>
+    @endif
+    <button type="submit" class="w-full rounded-xl bg-teal-300 px-4 py-3 font-bold text-slate-950 hover:bg-teal-200">Guardar cliente</button>
 </form>

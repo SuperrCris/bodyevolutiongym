@@ -66,6 +66,30 @@ class BiometricController extends Controller
         ]);
     }
 
+    public function iniciarEnrolar(Request $request, Cliente $cliente, VerificadorBiometrico $verifier): JsonResponse
+    {
+        $data = $request->validate([
+            'terminal_identifier' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $verifier->iniciarEnrolar(
+            $cliente,
+            $data['terminal_identifier'] ?? (string) config('biometria.terminal'),
+        );
+
+        return response()->json(['en_curso' => true], 202);
+    }
+
+    public function progresoEnrolar(Cliente $cliente, VerificadorBiometrico $verifier): JsonResponse
+    {
+        return response()->json($verifier->progresoEnrolar($cliente));
+    }
+
+    public function finalizarEnrolar(Cliente $cliente, VerificadorBiometrico $verifier): JsonResponse
+    {
+        return response()->json($verifier->finalizarEnrolar($cliente), 201);
+    }
+
     public function enrolar(Request $request, Cliente $cliente, VerificadorBiometrico $verifier): JsonResponse
     {
         $data = $request->validate([

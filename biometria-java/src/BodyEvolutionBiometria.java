@@ -43,6 +43,13 @@ public final class BodyEvolutionBiometria {
     private static volatile DPFPCapture listener;
     private static volatile boolean escuchando;
     private static volatile long ignoreUntil;
+    private static volatile String enrollmentClient = "";
+    private static volatile int enrollmentSamples;
+    private static volatile int enrollmentSamplesNeeded = 4;
+    private static volatile String enrollmentState = "inactivo";
+    private static volatile String enrollmentMessage = "Listo para registrar la huella.";
+    private static volatile String enrollmentError = "";
+    private static volatile String enrollmentTemplate = "";
     private static long sampleSeq;
     private static String lastSample;
     private static final Pattern FIELD = Pattern.compile("\"([^\"]+)\"\\s*:\\s*\"([^\"]*)\"");
@@ -54,6 +61,9 @@ public final class BodyEvolutionBiometria {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", PORT), 0);
         server.createContext("/salud", exchange -> respond(exchange, 200, salud()));
         server.createContext("/capturar", exchange -> handle(exchange, body -> exclusive(BodyEvolutionBiometria::capturar, body)));
+        server.createContext("/enrolar/iniciar", exchange -> handle(exchange, BodyEvolutionBiometria::iniciarEnrolar));
+        server.createContext("/enrolar/progreso", exchange -> handle(exchange, BodyEvolutionBiometria::progresoEnrolar));
+        server.createContext("/enrolar/resultado", exchange -> handle(exchange, BodyEvolutionBiometria::resultadoEnrolar));
         server.createContext("/enrolar", exchange -> handle(exchange, body -> exclusive(BodyEvolutionBiometria::enrolar, body)));
         server.createContext("/verificar", exchange -> handle(exchange, BodyEvolutionBiometria::verificar));
         server.createContext("/poll", exchange -> respond(exchange, 200, poll(exchange.getRequestURI().getRawQuery())));
@@ -177,9 +187,16 @@ public final class BodyEvolutionBiometria {
     }
 
     private static String enrolar(String body) throws Exception {
+        String cliente = field(body, "cliente");
         String terminal = field(body, "terminal");
         DPFPEnrollment enrollment = DPFPGlobal.getEnrollmentFactory().createEnrollment();
         DPFPFeatureExtraction extraction = DPFPGlobal.getFeatureExtractionFactory().createFeatureExtraction();
+        int totalSamples = enrollment.getFeaturesNeeded();
+
+        enrollmentClient = cliente;
+        enrollmentSamples = 0;
+        enrollmentSamplesNeeded = totalSamples;
+        enrollmentMessage = "Coloca el dedo en el lector.";
 
         while (enrollment.getFeaturesNeeded() > 0) {
             DPFPSample sample = captureSampleObject(terminal);
@@ -189,8 +206,12 @@ public final class BodyEvolutionBiometria {
                     DPFPDataPurpose.DATA_PURPOSE_ENROLLMENT
                 );
                 enrollment.addFeatures(features);
+                enrollmentSamples = totalSamples - enrollment.getFeaturesNeeded();
+                enrollmentMessage = enrollmentSamples < totalSamples
+                    ? "Captura " + enrollmentSamples + " de " + totalSamples + " aceptada. Retira el dedo y colócalo de nuevo."
+                    : "Las cuatro capturas fueron aceptadas.";
             } catch (DPFPImageQualityException ignored) {
-                // The reader asks for another impression when image quality is insufficient.
+                enrollmentMessage = "La lectura no fue clara. Limpia el dedo y vuelve a colocarlo.";
             }
         }
 
@@ -200,6 +221,82 @@ public final class BodyEvolutionBiometria {
         }
 
         return "{\"template\":\"" + encode(template.serialize()) + "\"}";
+    }
+
+    private static String iniciarEnrolar(String body) {
+        String cliente = field(body, "cliente");
+        String terminal = field(body, "terminal");
+
+        synchronized (STATE_LOCK) {
+            if ("en_curso".equals(enrollmentState)) {
+                throw new IllegalStateException("Ya hay un enrolamiento en curso.");
+            }
+
+            enrollmentClient = cliente;
+            enrollmentSamples = 0;
+            enrollmentSamplesNeeded = 4;
+            enrollmentMessage = "Coloca el dedo en el lector.";
+            enrollmentError = "";
+            enrollmentTemplate = "";
+            enrollmentState = "en_curso";
+        }
+
+        CompletableFuture.runAsync(() -> {
+            try {
+                String result = exclusive(BodyEvolutionBiometria::enrolar, body);
+                synchronized (STATE_LOCK) {
+                    enrollmentTemplate = field(result, "template");
+                    enrollmentState = "completado";
+                    enrollmentMessage = "Las cuatro capturas fueron aceptadas.";
+                }
+            } catch (Exception | LinkageError exception) {
+                String message = exception.getMessage() == null ? "Error biométrico." : exception.getMessage();
+                synchronized (STATE_LOCK) {
+                    enrollmentError = message;
+                    enrollmentMessage = message;
+                    enrollmentState = "error";
+                }
+            }
+        });
+
+        return "{\"en_curso\":true}";
+    }
+
+    private static String progresoEnrolar(String body) {
+        String cliente = field(body, "cliente");
+        boolean esEnrolamientoActual = cliente.equals(enrollmentClient);
+        String estado = esEnrolamientoActual ? enrollmentState : "inactivo";
+        int muestras = esEnrolamientoActual ? enrollmentSamples : 0;
+        int total = esEnrolamientoActual ? Math.max(1, enrollmentSamplesNeeded) : 4;
+        String mensaje = esEnrolamientoActual ? enrollmentMessage : "Listo para registrar la huella.";
+        String error = esEnrolamientoActual ? enrollmentError : "";
+        boolean enCurso = "en_curso".equals(estado);
+
+        return "{\"muestras\":" + muestras
+            + ",\"total\":" + total
+            + ",\"en_curso\":" + enCurso
+            + ",\"estado\":\"" + escape(estado)
+            + "\",\"mensaje\":\"" + escape(mensaje)
+            + "\",\"error\":\"" + escape(error) + "\"}";
+    }
+
+    private static String resultadoEnrolar(String body) {
+        String cliente = field(body, "cliente");
+
+        synchronized (STATE_LOCK) {
+            if (!cliente.equals(enrollmentClient) || !"completado".equals(enrollmentState) || enrollmentTemplate.isEmpty()) {
+                throw new IllegalStateException("El enrolamiento todavía no está completo.");
+            }
+
+            String template = enrollmentTemplate;
+            enrollmentClient = "";
+            enrollmentTemplate = "";
+            enrollmentError = "";
+            enrollmentState = "inactivo";
+            enrollmentMessage = "Listo para registrar la huella.";
+
+            return "{\"template\":\"" + template + "\"}";
+        }
     }
 
     private static String verificar(String body) throws Exception {

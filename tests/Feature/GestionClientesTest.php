@@ -17,7 +17,7 @@ test('un operador puede iniciar sesión y crear un cliente', function () {
     ]);
 
     $this->post('/login', [
-        'email' => 'operador@example.com',
+        'username' => 'operador',
         'password' => 'password',
     ])->assertRedirect('/clientes');
 
@@ -31,6 +31,69 @@ test('un operador puede iniciar sesión y crear un cliente', function () {
 
     expect($usuario->refresh()->exists)->toBeTrue();
     expect(Cliente::query()->where('documento', 'DOC-001')->exists())->toBeTrue();
+});
+
+test('un operador puede guardar un cliente y continuar con el registro de su huella', function () {
+    $usuario = Usuario::create([
+        'name' => 'Operador',
+        'email' => 'operador.huella@example.com',
+        'password' => 'password',
+    ]);
+
+    $response = $this->actingAs($usuario)
+        ->post('/clientes', [
+            'nombre' => 'Ana',
+            'apellido' => 'García',
+            'registrar_huella_despues' => '1',
+        ]);
+    $cliente = Cliente::query()->where('nombre', 'Ana')->firstOrFail();
+
+    $response->assertRedirect('/clientes')
+        ->assertSessionHas('cliente_para_enrolar', $cliente->id);
+    $this->assertModelExists($cliente);
+});
+
+test('muestra el modal de enrolamiento una sola vez para el cliente recién creado', function () {
+    $usuario = Usuario::create([
+        'name' => 'Operador',
+        'email' => 'operador.modal.huella@example.com',
+        'password' => 'password',
+    ]);
+    $cliente = Cliente::create(['nombre' => 'Ana', 'apellido' => 'García']);
+
+    $response = $this->actingAs($usuario)
+        ->withSession(['cliente_para_enrolar' => $cliente->id])
+        ->get('/clientes')
+        ->assertOk();
+
+    $response
+        ->assertSee('Cliente: Ana García')
+        ->assertSee('data-paso-enrolamiento="4"', false)
+        ->assertSee('data-mensaje-enrolamiento', false);
+    expect(substr_count($response->getContent(), '<div data-progreso-enrolamiento='))
+        ->toBe(1);
+
+    $this->get('/clientes')
+        ->assertOk()
+        ->assertDontSee('Cliente: Ana García');
+});
+
+test('ofrece el enrolamiento desde editar y mantiene una sola interfaz compartida', function () {
+    $usuario = Usuario::create([
+        'name' => 'Operador',
+        'email' => 'operador.editar.huella@example.com',
+        'password' => 'password',
+    ]);
+    $cliente = Cliente::create(['nombre' => 'Ana', 'apellido' => 'García']);
+
+    $response = $this->actingAs($usuario)->get('/clientes');
+
+    $response->assertOk()
+        ->assertSee('data-open-enrollment="'.$cliente->id.'"', false)
+        ->assertSee('data-open-modal="renovar-'.$cliente->id.'"', false)
+        ->assertDontSee('data-enrolar-huella="'.$cliente->id.'"', false);
+    expect(substr_count($response->getContent(), '<div data-progreso-enrolamiento='))
+        ->toBe(1);
 });
 
 test('un operador puede renovar la membresía de un cliente', function () {

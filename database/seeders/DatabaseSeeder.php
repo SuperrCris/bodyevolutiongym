@@ -17,7 +17,9 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         Usuario::query()->updateOrCreate(['email' => 'admin@bodyevolutiongym.test'], [
-            'name' => 'Test User',
+            'name' => 'Cristian',
+            'username' => 'cristian',
+            'role' => Usuario::ROLE_ADMINISTRADOR,
             'password' => 'password',
         ]);
 

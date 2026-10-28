@@ -16,6 +16,79 @@ test('resuelve el adaptador DigitalPersona desde el contenedor', function () {
         ->toBeInstanceOf(VerificadorBiometricoSdk::class);
 });
 
+test('devuelve el progreso real del enrolamiento de huella', function () {
+    Http::preventStrayRequests();
+    Http::fake([
+        'http://127.0.0.1:8765/enrolar/progreso' => Http::response([
+            'muestras' => 2,
+            'total' => 4,
+            'en_curso' => true,
+            'estado' => 'en_curso',
+            'mensaje' => 'Captura 2 de 4 aceptada.',
+        ]),
+    ]);
+
+    $cliente = Cliente::create(['nombre' => 'Ana', 'apellido' => 'García']);
+    $usuario = Usuario::create([
+        'name' => 'Operador',
+        'email' => 'operador.progreso@example.com',
+        'password' => 'password',
+    ]);
+
+    $this->actingAs($usuario)
+        ->getJson("/api/v1/customers/{$cliente->id}/biometrics/enroll/progress")
+        ->assertOk()
+        ->assertJson([
+            'muestras' => 2,
+            'total' => 4,
+            'en_curso' => true,
+            'estado' => 'en_curso',
+            'mensaje' => 'Captura 2 de 4 aceptada.',
+        ]);
+});
+
+test('completa un enrolamiento asíncrono y guarda la credencial biométrica', function () {
+    Http::preventStrayRequests();
+    Http::fake([
+        'http://127.0.0.1:8765/enrolar/iniciar' => Http::response(['en_curso' => true]),
+        'http://127.0.0.1:8765/enrolar/progreso' => Http::response([
+            'muestras' => 4,
+            'total' => 4,
+            'en_curso' => false,
+            'estado' => 'completado',
+            'mensaje' => 'Las cuatro capturas fueron aceptadas.',
+            'error' => '',
+        ]),
+        'http://127.0.0.1:8765/enrolar/resultado' => Http::response([
+            'template' => base64_encode('plantilla-digitalpersona'),
+        ]),
+    ]);
+
+    $cliente = Cliente::create(['nombre' => 'Ana', 'apellido' => 'García']);
+    $usuario = Usuario::create([
+        'name' => 'Operador',
+        'email' => 'operador.async@example.com',
+        'password' => 'password',
+    ]);
+
+    $this->actingAs($usuario)
+        ->postJson("/api/v1/customers/{$cliente->id}/biometrics/enroll/start")
+        ->assertAccepted()
+        ->assertJson(['en_curso' => true]);
+    $this->actingAs($usuario)
+        ->getJson("/api/v1/customers/{$cliente->id}/biometrics/enroll/progress")
+        ->assertOk()
+        ->assertJsonPath('muestras', 4)
+        ->assertJsonPath('estado', 'completado');
+    $this->actingAs($usuario)
+        ->postJson("/api/v1/customers/{$cliente->id}/biometrics/enroll/finish")
+        ->assertCreated()
+        ->assertJsonPath('id_cliente', $cliente->id);
+
+    expect(CredencialBiometrica::query()->where('id_cliente', $cliente->id)->where('estado', true)->exists())
+        ->toBeTrue();
+});
+
 test('registra una plantilla biométrica para un cliente', function () {
     Http::fake([
         'http://127.0.0.1:8765/enrolar' => Http::response([

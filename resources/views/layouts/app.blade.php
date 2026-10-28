@@ -5,18 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Body Evolution Gym')</title>
-    <link rel="icon" type="image/png" href="{{ asset('images/logo.png') }}">
+    <link rel="icon" type="image/png" href="{{ asset('images/favicon.png') }}">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-screen bg-slate-950 text-slate-100">
     <div class="min-h-screen bg-[radial-gradient(circle_at_top_right,_rgba(20,184,166,0.14),_transparent_34%),linear-gradient(135deg,#020617_0%,#0f172a_52%,#111827_100%)]">
         <header class="border-b border-white/10 bg-slate-950/70 backdrop-blur">
-            <div class="mx-auto flex max-w-7xl items-center justify-between gap-6 px-6 py-5">
+            <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-4">
                 <a href="{{ route('clientes.index') }}" class="flex items-center gap-3">
-                    <img src="{{ asset('images/logo.png') }}" alt="Body Evolution Gym" class="h-12 w-auto">
+                    <img src="{{ asset('images/logo.png') }}" alt="Body Evolution Gym" class="h-10 w-auto">
                 </a>
+                <nav class="flex flex-wrap items-center gap-2 text-sm text-slate-300">
+                    <a href="{{ route('clientes.index') }}" class="rounded-xl px-3 py-2 transition hover:bg-white/5 hover:text-teal-200">Clientes</a>
+                    <a href="{{ route('egresos.index') }}" class="rounded-xl px-3 py-2 transition hover:bg-white/5 hover:text-teal-200">Egresos</a>
+                    <a href="{{ route('reportes.index') }}" class="rounded-xl px-3 py-2 transition hover:bg-white/5 hover:text-teal-200">Reportes</a>
+                    @if (auth()->user()->esAdministrador())
+                        <a href="{{ route('empleados.index') }}" class="rounded-xl px-3 py-2 transition hover:bg-white/5 hover:text-teal-200">Empleados</a>
+                        <a href="{{ route('registros.index') }}" class="rounded-xl px-3 py-2 transition hover:bg-white/5 hover:text-teal-200">Auditoría</a>
+                    @endif
+                </nav>
                 <div class="flex items-center gap-4">
-                    <span class="hidden text-sm text-slate-300 sm:block">{{ auth()->user()->name }}</span>
+                    <span class="hidden text-sm text-slate-300 sm:block">{{ auth()->user()->name }} · {{ auth()->user()->role }}</span>
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
                         <button class="rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:border-teal-300/50 hover:text-teal-200">Salir</button>
