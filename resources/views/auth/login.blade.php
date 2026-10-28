@@ -39,7 +39,7 @@
                     </label>
                     <button class="w-full rounded-2xl bg-teal-300 px-4 py-3.5 font-bold text-slate-950 transition hover:bg-teal-200 focus:outline-none focus:ring-4 focus:ring-teal-300/20">Entrar</button>
                 </form>
-                <div class="my-6 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                <div class="mt-6 mb-6 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
                     <span class="h-px flex-1 bg-white/10"></span>
                     <span>O usa tu huella</span>
                     <span class="h-px flex-1 bg-white/10"></span>
@@ -47,7 +47,7 @@
                 <form method="POST" action="{{ route('login.fingerprint') }}" data-fingerprint-login>
                     @csrf
                     <button type="submit" class="flex w-full items-center justify-center gap-3 rounded-2xl border border-teal-300/30 bg-teal-300/10 px-4 py-3.5 font-bold text-teal-100 transition hover:bg-teal-300/20 focus:outline-none focus:ring-4 focus:ring-teal-300/20 disabled:cursor-wait disabled:opacity-60">
-                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" class="size-5">
+                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" class="size-5 h-10">
                             <path d="M12 11.5v2.75m-4.25-2.5a4.25 4.25 0 0 1 8.5 0v2.5m-11.5-2.5a7.25 7.25 0 0 1 14.5 0v1.5m-10.5 2.5c.3 2.2 1.15 4.15 2.5 5.75m3.75-5.75c-.1 1.7-.5 3.25-1.25 4.75M5.2 17.5c.35 1.3.85 2.45 1.55 3.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
                         </svg>
                         <span data-fingerprint-label>Entrar con huella</span>

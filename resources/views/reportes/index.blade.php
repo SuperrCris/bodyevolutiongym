@@ -67,7 +67,7 @@
             </article>
         </section>
 
-        <section class="overflow-hidden rounded-3xl border border-white/10 bg-slate-900/70 shadow-xl">
+        <section class="panel overflow-hidden shadow-xl">
             <div class="border-b border-white/10 px-5 py-4 sm:px-7">
                 <h2 class="font-bold text-white">Detalle de movimientos</h2>
             </div>

@@ -2,9 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Auditoria\AuditoriaServicio;
+use App\Domain\Impresion\TicketeraException;
+use App\Domain\Impresion\TicketeraServicio;
 use App\Domain\Membresias\MembresiasServicio;
 use App\Models\Cliente;
+use App\Models\Membresia;
+use App\Models\Pago;
 use App\Models\TipoMembresia;
+use App\Models\Usuario;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -94,32 +100,130 @@ class ClientesController extends Controller
         return to_route('clientes.index')->with('success', 'Cliente actualizado correctamente.');
     }
 
-    public function renew(
+    public function renovar(
         Request $request,
         Cliente $cliente,
         MembresiasServicio $servicio,
+        TicketeraServicio $ticketera,
     ): RedirectResponse {
         $data = $request->validate([
-            'tipo_membresia_id' => ['required', 'integer', 'exists:tipo_membresias,id'],
+            'tipo_membresia_id' => [
+                'required',
+                'integer',
+                Rule::exists('tipo_membresias', 'id')->where('activo', true),
+            ],
             'metodo_pago' => ['required', 'string', 'in:efectivo,tarjeta,transferencia'],
             'referencia' => ['nullable', 'string', 'max:100', 'unique:pagos,referencia'],
+            'imprimir' => ['sometimes', 'in:true,1'],
         ]);
 
         $metodos = [
-            'efectivo' => 'cash',
-            'tarjeta' => 'card',
-            'transferencia' => 'transfer',
+            'efectivo',
+            'tarjeta',
+            'transferencia',
         ];
 
-        $servicio->renovar(
+        $membresia = $servicio->renovar(
             $cliente,
             TipoMembresia::findOrFail($data['tipo_membresia_id']),
-            $metodos[$data['metodo_pago']],
+            $data['metodo_pago'],
             $request->user(),
             $data['referencia'] ?? null,
         );
 
+        if ($request->boolean('imprimir')) {
+            $pago = $membresia->pagos()->firstOrFail();
+
+            return $this->enviarRecibo($pago, $ticketera);
+        }
+
         return to_route('clientes.index')->with('success', 'Membresía renovada correctamente.');
+    }
+
+    public function actualizarVigencia(
+        Request $request,
+        Membresia $membresia,
+        AuditoriaServicio $auditoria,
+    ): RedirectResponse {
+        $administrador = $request->user();
+
+        if (! ($administrador instanceof Usuario) || ! $administrador->esAdministrador()) {
+            abort(403);
+        }
+
+        $data = $request->validate([
+            'finalizacion' => ['required', 'date_format:Y-m-d', 'after_or_equal:'.now()->toDateString()],
+        ], [
+            'finalizacion.after_or_equal' => 'La vigencia no puede ser anterior al día actual.',
+        ]);
+        $fechaNueva = $data['finalizacion'];
+
+        $actualizado = DB::transaction(function () use (
+            $membresia,
+            $administrador,
+            $auditoria,
+            $fechaNueva,
+        ): bool {
+            $membresiaBloqueada = Membresia::query()
+                ->lockForUpdate()
+                ->findOrFail($membresia->getKey());
+            $fechaAnterior = $membresiaBloqueada->finalizacion->toDateString();
+
+            if ($fechaAnterior === $fechaNueva) {
+                return false;
+            }
+
+            $membresiaBloqueada->finalizacion = $fechaNueva;
+            $membresiaBloqueada->save();
+
+            $auditoria->registrarCambioFinalizacionMembresia(
+                $membresiaBloqueada,
+                $fechaAnterior,
+                $fechaNueva,
+                $administrador,
+            );
+
+            return true;
+        });
+
+        return to_route('clientes.index')->with(
+            'success',
+            $actualizado
+                ? 'Vigencia de membresía actualizada y registrada en auditoría.'
+                : 'La membresía ya tenía esa fecha de vigencia; no se registró ningún cambio.',
+        );
+    }
+
+    public function printReceipt(Pago $pago, TicketeraServicio $ticketera): RedirectResponse
+    {
+        return $this->enviarRecibo($pago, $ticketera);
+    }
+
+    public function receipt(Pago $pago): View
+    {
+        $pago->load(['cliente', 'membresia.plan', 'usuario']);
+
+        return view('pagos.recibo', [
+            'pago' => $pago,
+            'metodoPago' => match ($pago->metodo_pago) {
+                'efectivo' => 'Efectivo',
+                'tarjeta' => 'Tarjeta',
+                'transferencia' => 'Transferencia',
+                default => $pago->metodo_pago,
+            },
+        ]);
+    }
+
+    private function enviarRecibo(Pago $pago, TicketeraServicio $ticketera): RedirectResponse
+    {
+        try {
+            $impresora = $ticketera->imprimir($pago);
+        } catch (TicketeraException $exception) {
+            return to_route('pagos.recibo', $pago)->with('error', $exception->getMessage());
+        }
+
+        return to_route('clientes.index')
+            ->with('success', "Recibo enviado a la impresora predeterminada: {$impresora}.");
     }
 
     public function resumen(): JsonResponse
@@ -190,6 +294,10 @@ class ClientesController extends Controller
             $query->whereRaw('LOWER(nombre) LIKE ?', [$likeTerm])
                 ->orWhereRaw('LOWER(apellido) LIKE ?', [$likeTerm])
                 ->orWhereRaw('LOWER(documento) LIKE ?', [$likeTerm]);
+
+            if (ctype_digit($term)) {
+                $query->orWhere('id', (int) $term);
+            }
 
             if (DB::connection()->getDriverName() !== 'pgsql' || Str::length($term) < 3) {
                 return;

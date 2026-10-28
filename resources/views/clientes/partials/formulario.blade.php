@@ -21,5 +21,5 @@
     @if ($cliente === null)
         <button type="submit" name="registrar_huella_despues" value="1" class="w-full rounded-xl border border-indigo-300/40 px-4 py-3 font-bold text-indigo-200 hover:border-indigo-200 hover:bg-indigo-300/10">Guardar y registrar huella</button>
     @endif
-    <button type="submit" class="w-full rounded-xl bg-teal-300 px-4 py-3 font-bold text-slate-950 hover:bg-teal-200">Guardar cliente</button>
+    <button type="submit" class="button-primary w-full px-4 py-3">Guardar cliente</button>
 </form>

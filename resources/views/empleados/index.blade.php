@@ -12,44 +12,44 @@
             </div>
         </div>
 
-        <section class="rounded-3xl border border-white/10 bg-slate-900/70 p-5 shadow-xl sm:p-7">
+        <section class="panel p-5 shadow-xl sm:p-7">
             <h2 class="text-lg font-bold text-white">Crear cuenta</h2>
             <form method="POST" action="{{ route('empleados.store') }}" class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 @csrf
                 <label class="block">
-                    <span class="mb-2 block text-sm font-medium text-slate-300">Nombre completo</span>
-                    <input name="name" value="{{ old('name') }}" required maxlength="255" class="w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none focus:border-teal-300" autocomplete="name">
+                    <span class="field-label">Nombre completo</span>
+                    <input name="name" value="{{ old('name') }}" required maxlength="255" class="field-control" autocomplete="name">
                 </label>
                 <label class="block">
-                    <span class="mb-2 block text-sm font-medium text-slate-300">Usuario de acceso</span>
-                    <input name="username" value="{{ old('username') }}" required minlength="3" maxlength="40" pattern="[A-Za-z0-9._-]+" class="w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none focus:border-teal-300" autocomplete="username">
+                    <span class="field-label">Usuario de acceso</span>
+                    <input name="username" value="{{ old('username') }}" required minlength="3" maxlength="40" pattern="[A-Za-z0-9._-]+" class="field-control" autocomplete="username">
                 </label>
                 <label class="block">
-                    <span class="mb-2 block text-sm font-medium text-slate-300">Rol</span>
-                    <select name="role" required class="w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none focus:border-teal-300">
+                    <span class="field-label">Rol</span>
+                    <select name="role" required class="field-control">
                         <option value="recepcionista">Recepcionista</option>
                         <option value="administrador" @selected(old('role') === 'administrador')>Administrador</option>
                     </select>
                 </label>
                 <label class="block">
-                    <span class="mb-2 block text-sm font-medium text-slate-300">Correo (opcional)</span>
-                    <input type="email" name="email" value="{{ old('email') }}" maxlength="255" class="w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none focus:border-teal-300" autocomplete="email">
+                    <span class="field-label">Correo (opcional)</span>
+                    <input type="email" name="email" value="{{ old('email') }}" maxlength="255" class="field-control" autocomplete="email">
                 </label>
                 <label class="block">
-                    <span class="mb-2 block text-sm font-medium text-slate-300">Contraseña inicial</span>
-                    <input type="password" name="password" required minlength="8" class="w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none focus:border-teal-300" autocomplete="new-password">
+                    <span class="field-label">Contraseña inicial</span>
+                    <input type="password" name="password" required minlength="8" class="field-control" autocomplete="new-password">
                 </label>
                 <label class="block">
-                    <span class="mb-2 block text-sm font-medium text-slate-300">Confirmar contraseña</span>
-                    <input type="password" name="password_confirmation" required minlength="8" class="w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none focus:border-teal-300" autocomplete="new-password">
+                    <span class="field-label">Confirmar contraseña</span>
+                    <input type="password" name="password_confirmation" required minlength="8" class="field-control" autocomplete="new-password">
                 </label>
                 <div class="md:col-span-2 xl:col-span-3">
-                    <button class="rounded-xl bg-teal-300 px-5 py-3 font-bold text-slate-950 transition hover:bg-teal-200">Crear empleado</button>
+                    <button class="button-primary px-5 py-3 transition">Crear empleado</button>
                 </div>
             </form>
         </section>
 
-        <section class="overflow-hidden rounded-3xl border border-white/10 bg-slate-900/70 shadow-xl">
+        <section class="panel overflow-hidden shadow-xl">
             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-4 sm:px-7">
                 <h2 class="text-lg font-bold text-white">Cuentas registradas</h2>
                 <span class="text-sm text-slate-400">{{ $empleados->total() }} cuentas</span>
@@ -71,31 +71,31 @@
                             @csrf
                             @method('PUT')
                             <label class="block">
-                                <span class="mb-2 block text-sm font-medium text-slate-300">Nombre completo</span>
-                                <input name="name" value="{{ $empleado->name }}" required maxlength="255" class="w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none focus:border-teal-300">
+                                <span class="field-label">Nombre completo</span>
+                                <input name="name" value="{{ $empleado->name }}" required maxlength="255" class="field-control-solid">
                             </label>
                             <label class="block">
-                                <span class="mb-2 block text-sm font-medium text-slate-300">Usuario</span>
-                                <input name="username" value="{{ $empleado->username }}" required minlength="3" maxlength="40" pattern="[A-Za-z0-9._-]+" class="w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none focus:border-teal-300">
+                                <span class="field-label">Usuario</span>
+                                <input name="username" value="{{ $empleado->username }}" required minlength="3" maxlength="40" pattern="[A-Za-z0-9._-]+" class="field-control-solid">
                             </label>
                             <label class="block">
-                                <span class="mb-2 block text-sm font-medium text-slate-300">Rol</span>
-                                <select name="role" required class="w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none focus:border-teal-300">
+                                <span class="field-label">Rol</span>
+                                <select name="role" required class="field-control-solid">
                                     <option value="recepcionista" @selected($empleado->role === 'recepcionista')>Recepcionista</option>
                                     <option value="administrador" @selected($empleado->role === 'administrador')>Administrador</option>
                                 </select>
                             </label>
                             <label class="block">
-                                <span class="mb-2 block text-sm font-medium text-slate-300">Correo (opcional)</span>
-                                <input type="email" name="email" value="{{ $empleado->email }}" maxlength="255" class="w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none focus:border-teal-300">
+                                <span class="field-label">Correo (opcional)</span>
+                                <input type="email" name="email" value="{{ $empleado->email }}" maxlength="255" class="field-control-solid">
                             </label>
                             <label class="block">
-                                <span class="mb-2 block text-sm font-medium text-slate-300">Nueva contraseña (opcional)</span>
-                                <input type="password" name="password" minlength="8" class="w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none focus:border-teal-300" autocomplete="new-password">
+                                <span class="field-label">Nueva contraseña (opcional)</span>
+                                <input type="password" name="password" minlength="8" class="field-control-solid" autocomplete="new-password">
                             </label>
                             <label class="block">
-                                <span class="mb-2 block text-sm font-medium text-slate-300">Confirmar contraseña</span>
-                                <input type="password" name="password_confirmation" minlength="8" class="w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none focus:border-teal-300" autocomplete="new-password">
+                                <span class="field-label">Confirmar contraseña</span>
+                                <input type="password" name="password_confirmation" minlength="8" class="field-control-solid" autocomplete="new-password">
                             </label>
                             <div class="md:col-span-2 xl:col-span-3">
                                 <button class="rounded-xl border border-teal-300/30 px-4 py-2.5 text-sm font-semibold text-teal-200 transition hover:bg-teal-300/10">Guardar cambios</button>

@@ -12,7 +12,6 @@ Route::prefix('v1')->middleware(['web', 'auth', 'rol:recepcionista'])->group(fun
     Route::post('clientes', [CustomerController::class, 'store']);
     Route::get('clientes/{customer}', [CustomerController::class, 'show']);
     Route::get('planes-de-membresia', [MembershipPlanController::class, 'index']);
-    Route::post('planes-de-membresia', [MembershipPlanController::class, 'store']);
     Route::post('clientes/{cliente}/membresias/renovar', [MembershipController::class, 'renew']);
     Route::post('biometricos/verificar', [BiometricController::class, 'verificar']);
     Route::post('biometricos/capturar', [BiometricController::class, 'capturar']);
@@ -31,6 +30,7 @@ Route::prefix('v1')->middleware(['web', 'auth', 'rol:recepcionista'])->group(fun
     Route::post('customers/{cliente}/biometrics/enroll', [BiometricController::class, 'enrolar']);
 
     Route::middleware('rol:administrador')->group(function (): void {
+        Route::post('planes-de-membresia', [MembershipPlanController::class, 'store']);
         Route::post('empleados/{empleado}/biometricos/enrolar/iniciar', [EmpleadoBiometriaController::class, 'iniciarEnrolar'])
             ->name('empleados.huella.iniciar');
         Route::get('empleados/{empleado}/biometricos/enrolar/progreso', [EmpleadoBiometriaController::class, 'progresoEnrolar'])

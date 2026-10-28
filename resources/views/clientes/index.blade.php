@@ -6,16 +6,16 @@
 <div class="space-y-8">
     <div class="flex flex-col justify-between gap-5 md:flex-row md:items-end">
         <div>
-            <p class="text-sm font-semibold uppercase tracking-[0.25em] text-teal-300">Centro de control</p>
-            <h1 class="mt-2 text-4xl font-black tracking-tight sm:text-5xl">Clientes</h1>
+            <h2 class="mt-2 text-3xl font-black text-white">Clientes</h2>
 
         </div>
         <div class="flex flex-wrap gap-3">
-            <button type="button" data-verificar-huella class="rounded-2xl border border-teal-300/40 px-5 py-3 font-bold text-teal-200 transition hover:border-teal-200 hover:text-teal-100">Verificar huella</button>
+          <button type="button" data-verificar-huella class="rounded-2xl border border-teal-300/40 px-5 py-3 font-bold text-teal-200 transition hover:border-teal-200 hover:text-teal-100">Verificar huella</button>
             <button type="button" data-open-modal="crearCliente" class="rounded-2xl bg-teal-300 px-5 py-3 font-bold text-slate-950 shadow-lg shadow-teal-950/20 transition hover:bg-teal-200">+ Nuevo cliente</button>
         </div>
     </div>
 
+    <!--
     <div class="grid gap-4 sm:grid-cols-3">
         <div class="rounded-3xl border border-white/10 bg-white/5 p-5">
             <p class="text-sm text-slate-400">Clientes registrados</p>
@@ -31,93 +31,76 @@
             <p class="mt-1 text-xs text-teal-100/60">Actualiza actividad cada 15 s</p>
         </div>
     </div>
-
-    <div class="rounded-3xl border border-white/10 bg-slate-900/70 p-5">
+-->
+    <div class="panel p-5">
         <form method="GET" class="flex flex-col gap-3 sm:flex-row">
-            <input name="buscar" value="{{ request('buscar') }}" class="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm outline-none focus:border-teal-300/60" placeholder="Buscar por nombre o documento...">
+            <input name="buscar" value="{{ request('buscar') }}" class="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm outline-none focus:border-teal-300/60" placeholder="Buscar por nombre...">
             <button class="rounded-2xl border border-white/10 px-5 py-3 text-sm font-semibold text-slate-300 transition hover:border-teal-300/50 hover:text-teal-200">Buscar</button>
         </form>
     </div>
 
-    <div class="grid gap-2">
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         @forelse ($clientes as $cliente)
             @php($membresia = $cliente->membresias->first())
             @php($tieneHuella = $cliente->credencialesBiometricas->isNotEmpty())
-            <article class="@container rounded-2xl border border-white/10 bg-white/[0.045] p-3 transition hover:border-teal-300/30">
-                <div class="grid gap-3 @2xl:grid-cols-[minmax(14rem,1fr)_minmax(16rem,1.2fr)_auto] @2xl:items-center @2xl:gap-4">
-                    <div class="flex min-w-0 items-center gap-2">
-                        @if ($cliente->foto)
-                            <img src="{{ asset('storage/'.$cliente->foto) }}" alt="Foto de {{ $cliente->nombre }} {{ $cliente->apellido }}" class="size-9 shrink-0 rounded-xl object-cover">
-                        @else
-                            <div class="grid size-9 shrink-0 place-items-center rounded-xl bg-slate-800 text-base font-black text-teal-300">{{ strtoupper(substr($cliente->nombre, 0, 1).substr($cliente->apellido, 0, 1)) }}</div>
-                        @endif
-                        <div class="min-w-0 flex-1">
-                            <div class="flex min-w-0 items-center gap-2">
-                                <h2 class="min-w-0 flex-1 truncate text-sm font-bold" title="{{ $cliente->nombre }} {{ $cliente->apellido }}">{{ $cliente->nombre }} {{ $cliente->apellido }}</h2>
-                                <span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold {{ $membresia?->estaActiva() ? 'bg-teal-300/15 text-teal-200' : 'bg-amber-300/15 text-amber-200' }}">{{ $membresia?->estaActiva() ? 'Activo' : 'Sin plan activo' }}</span>
-                            </div>
-                            <p class="truncate text-xs text-slate-400" title="{{ $cliente->telefono ?: 'Sin teléfono' }}">{{ $cliente->telefono ?: 'Sin teléfono' }}</p>
-                        </div>
+            <article class="flex h-full flex-col gap-4 rounded-3xl border border-white/10 bg-white/[0.045] p-4 transition hover:border-teal-300/30 hover:bg-white/[0.06]">
+                <div class="flex min-w-0 items-start gap-3">
+                    @if ($cliente->foto)
+                        <img src="{{ asset('storage/'.$cliente->foto) }}" alt="Foto de {{ $cliente->nombre }} {{ $cliente->apellido }}" class="size-12 shrink-0 rounded-2xl object-cover ring-1 ring-white/10">
+                    @else
+                        <div class="grid size-12 shrink-0 place-items-center rounded-2xl bg-slate-800 text-base font-black text-teal-300">{{ strtoupper(substr($cliente->nombre, 0, 1).substr($cliente->apellido, 0, 1)) }}</div>
+                    @endif
+                    <div class="min-w-0 flex-1">
+                        <h2 class="truncate text-base font-bold" title="#{{ $cliente->id }} - {{ $cliente->nombre }} {{ $cliente->apellido }}">#{{ $cliente->id }} - {{ $cliente->nombre }} {{ $cliente->apellido }}</h2>
+                        <p class="mt-1 truncate text-sm text-slate-400" title="{{ $cliente->telefono ?: 'Sin teléfono' }}">{{ $cliente->telefono ?: 'Sin teléfono' }}</p>
+                        <span class="mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {{ $membresia?->estaActiva() ? 'bg-teal-300/15 text-teal-200' : 'bg-amber-300/15 text-amber-200' }}">{{ $membresia?->estaActiva() ? 'Membresía activa' : 'Sin plan activo' }}</span>
                     </div>
-                    <div class="grid grid-cols-2 items-center gap-x-3 gap-y-2 rounded-xl bg-slate-950/50 p-2.5 text-sm @2xl:grid-cols-3">
-                        <div class="min-w-0">
-                            <p class="text-[10px] text-slate-500">Plan actual</p>
-                            <p class="truncate text-xs font-semibold" title="{{ $membresia?->plan?->nombre ?: '—' }}">{{ $membresia?->plan?->nombre ?: '—' }}</p>
-                        </div>
-                        <div class="min-w-0">
-                            <p class="text-[10px] text-slate-500">Vigencia</p>
-                            <p class="text-xs font-semibold">{{ $membresia?->finalizacion?->format('d/m/Y') ?: '—' }}</p>
-                        </div>
-                        <div class="col-span-2 flex items-center justify-between gap-2 border-t border-white/10 pt-2 @2xl:col-span-1 @2xl:border-t-0 @2xl:pt-0">
-                            <div class="flex min-w-0 items-center gap-2">
-                                <span data-huella-indicador="{{ $cliente->id }}" class="relative grid size-6 shrink-0 place-items-center">
-                                    <svg class="size-5 text-slate-300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                        <path d="M5 11a7 7 0 0 1 14 0v2M7.5 10.5a4.5 4.5 0 0 1 9 0v3M10 10.5a2 2 0 0 1 4 0v4a8 8 0 0 1-1.25 4.3M12 12v3a10 10 0 0 1-1.5 5.5M9 13v1a5 5 0 0 1-.75 2.5M17 13v1.5a12 12 0 0 1-1 4" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" />
-                                    </svg>
-                                    <span class="absolute -bottom-0.5 -right-0.5 grid size-3.5 place-items-center rounded-full bg-slate-900">
-                                        <svg data-huella-check class="{{ $tieneHuella ? '' : 'hidden' }} size-2.5 text-teal-300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                                            <path d="m4.5 10.5 3.75 3.75L15.75 6.75" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
-                                        </svg>
-                                        <svg data-huella-cross class="{{ $tieneHuella ? 'hidden' : '' }} size-2.5 text-rose-300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                                            <path d="m6 6 8 8m0-8-8 8" stroke="currentColor" stroke-linecap="round" stroke-width="2" />
-                                        </svg>
-                                    </span>
-                                </span>
-                                <span data-huella-estado="{{ $cliente->id }}" class="truncate text-xs font-semibold {{ $tieneHuella ? 'text-teal-200' : 'text-slate-300' }}">{{ $tieneHuella ? 'Registrada' : 'Sin registrar' }}</span>
-                            </div>
-                        </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3 rounded-2xl bg-slate-950/50 p-3">
+                    <div class="min-w-0">
+                        <p class="text-xs text-slate-500">Plan actual</p>
+                        <p class="mt-1 truncate text-sm font-semibold" title="{{ $membresia?->plan?->nombre ?: '—' }}">{{ $membresia?->plan?->nombre ?: '—' }}</p>
                     </div>
-                    <div class="flex justify-end">
-                        <div class="hidden flex-wrap justify-end gap-1.5 @5xl:flex">
-                            <button type="button" data-open-modal="editar-{{ $cliente->id }}" class="rounded-lg border border-white/10 px-2.5 py-1.5 text-xs font-semibold text-slate-300 hover:border-teal-300/50 hover:text-teal-200">Editar</button>
-                            <button type="button" data-open-modal="renovar-{{ $cliente->id }}" class="rounded-lg bg-teal-300 px-2.5 py-1.5 text-xs font-bold text-slate-950 hover:bg-teal-200">Renovar</button>
-                        </div>
-                        <details class="group relative @5xl:hidden">
-                            <summary class="inline-flex cursor-pointer list-none items-center gap-2 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs font-semibold text-slate-300 hover:border-teal-300/50 hover:text-teal-200">
-                                Acciones
-                                <svg class="size-4 transition group-open:rotate-180" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                    <path fill-rule="evenodd" d="M5.22 7.47a.75.75 0 0 1 1.06 0L10 11.19l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 8.53a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+                    <div class="min-w-0">
+                        <p class="text-xs text-slate-500">Vigencia</p>
+                        <p class="mt-1 text-sm font-semibold">{{ $membresia?->finalizacion?->format('d/m/Y') ?: '—' }}</p>
+                    </div>
+                    @if ($membresia && auth()->user()->esAdministrador())
+                        @include('clientes.partials.vigencia', ['membresia' => $membresia])
+                    @endif
+                    <div class="col-span-2 flex items-center gap-2 border-t border-white/10 pt-3">
+                        <span data-huella-indicador="{{ $cliente->id }}" class="relative grid size-6 shrink-0 place-items-center">
+                            <svg class="size-5 text-slate-300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <path d="M5 11a7 7 0 0 1 14 0v2M7.5 10.5a4.5 4.5 0 0 1 9 0v3M10 10.5a2 2 0 0 1 4 0v4a8 8 0 0 1-1.25 4.3M12 12v3a10 10 0 0 1-1.5 5.5M9 13v1a5 5 0 0 1-.75 2.5M17 13v1.5a12 12 0 0 1-1 4" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" />
+                            </svg>
+                            <span class="absolute -bottom-0.5 -right-0.5 grid size-3.5 place-items-center rounded-full bg-slate-900">
+                                <svg data-huella-check class="{{ $tieneHuella ? '' : 'hidden' }} size-2.5 text-teal-300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                                    <path d="m4.5 10.5 3.75 3.75L15.75 6.75" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
                                 </svg>
-                            </summary>
-                            <div class="absolute right-0 top-full z-20 mt-2 flex min-w-48 flex-col gap-1 rounded-xl border border-white/10 bg-slate-900 p-2 shadow-xl">
-                                <button type="button" data-open-modal="editar-{{ $cliente->id }}" class="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-slate-300 hover:bg-white/5 hover:text-teal-200">Editar</button>
-                                <button type="button" data-open-modal="renovar-{{ $cliente->id }}" class="w-full rounded-lg px-3 py-2 text-left text-sm font-bold text-teal-200 hover:bg-white/5">Renovar membresía</button>
-                            </div>
-                        </details>
+                                <svg data-huella-cross class="{{ $tieneHuella ? 'hidden' : '' }} size-2.5 text-rose-300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                                    <path d="m6 6 8 8m0-8-8 8" stroke="currentColor" stroke-linecap="round" stroke-width="2" />
+                                </svg>
+                            </span>
+                        </span>
+                        <span data-huella-estado="{{ $cliente->id }}" class="text-sm font-semibold {{ $tieneHuella ? 'text-teal-200' : 'text-slate-300' }}">{{ $tieneHuella ? 'Huella registrada' : 'Huella sin registrar' }}</span>
                     </div>
+                </div>
+                <div class="mt-auto flex gap-2 border-t border-white/10 pt-3">
+                    <button type="button" data-open-modal="editar-{{ $cliente->id }}" class="min-h-11 flex-1 rounded-xl border border-white/10 px-3 py-2 text-sm font-semibold text-slate-300 transition hover:border-teal-300/50 hover:text-teal-200">Editar</button>
+                    <button type="button" data-open-modal="renovar-{{ $cliente->id }}" class="button-primary min-h-11 flex-1 px-3 py-2 text-sm transition">Renovar</button>
                 </div>
             </article>
             @include('clientes.partials.editar', ['cliente' => $cliente])
             @include('clientes.partials.renovar', ['cliente' => $cliente, 'planes' => $planes, 'tieneHuella' => $tieneHuella])
         @empty
-            <div class="rounded-3xl border border-dashed border-white/15 p-10 text-center text-slate-400">No hay clientes que coincidan con la búsqueda.</div>
+            <div class="col-span-full rounded-3xl border border-dashed border-white/15 p-10 text-center text-slate-400">No hay clientes que coincidan con la búsqueda.</div>
         @endforelse
     </div>
     <div>{{ $clientes->links() }}</div>
 </div>
 
-<div id="crearCliente" data-modal class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/80 p-6 backdrop-blur-sm">
-    <div class="w-full max-w-lg rounded-3xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
+<div id="crearCliente" data-modal class="modal-backdrop z-50 hidden bg-slate-950/80">
+    <div class="modal-panel w-full max-w-lg">
         <div class="flex items-center justify-between"><h2 class="text-xl font-bold">Nuevo cliente</h2><button type="button" data-close-modal class="text-2xl text-slate-500 hover:text-white">×</button></div>
         @include('clientes.partials.formulario', ['action' => route('clientes.store'), 'method' => 'POST', 'cliente' => null])
     </div>
@@ -129,9 +112,9 @@
     data-enrolamiento-inicial="{{ $clienteParaEnrolar?->id ?? '' }}"
     data-enrolamiento-nombre="{{ $clienteParaEnrolar ? $clienteParaEnrolar->nombre.' '.$clienteParaEnrolar->apellido : '' }}"
     data-enrolamiento-tiene-huella="{{ $clienteParaEnrolar && $clienteParaEnrolar->credencialesBiometricas->isNotEmpty() ? 'true' : 'false' }}"
-    class="fixed inset-0 z-[55] {{ $clienteParaEnrolar ? 'flex' : 'hidden' }} items-center justify-center bg-slate-950/80 p-6 backdrop-blur-sm"
+    class="modal-backdrop z-[55] {{ $clienteParaEnrolar ? 'flex' : 'hidden' }} bg-slate-950/80"
 >
-    <div class="w-full max-w-lg rounded-3xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
+    <div class="modal-panel w-full max-w-lg">
         <div class="flex items-center justify-between gap-4">
             <div>
                 <h2 data-titulo-enrolamiento class="text-xl font-bold">Registrar huella</h2>
@@ -143,8 +126,8 @@
     </div>
 </div>
 
-<div id="camaraCliente" data-camera-modal class="fixed inset-0 z-[60] hidden items-center justify-center bg-slate-950/90 p-6 backdrop-blur-sm">
-    <div class="w-full max-w-2xl rounded-3xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
+<div id="camaraCliente" data-camera-modal class="modal-backdrop z-[60] hidden bg-slate-950/90">
+    <div class="modal-panel w-full max-w-2xl">
         <div class="flex items-center justify-between gap-4">
             <div>
                 <h2 class="text-xl font-bold">Capturar foto</h2>
@@ -156,7 +139,7 @@
         <canvas data-camera-canvas class="hidden"></canvas>
         <div class="mt-5 flex justify-end gap-3">
             <button type="button" data-close-camera class="rounded-xl border border-white/10 px-4 py-3 font-semibold text-slate-300 hover:border-white/30">Cancelar</button>
-            <button type="button" data-capture-photo class="rounded-xl bg-teal-300 px-5 py-3 font-bold text-slate-950 hover:bg-teal-200">Capturar foto</button>
+            <button type="button" data-capture-photo class="button-primary px-5 py-3">Capturar foto</button>
         </div>
     </div>
 </div>

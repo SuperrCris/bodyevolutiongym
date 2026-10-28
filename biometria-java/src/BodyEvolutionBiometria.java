@@ -21,22 +21,46 @@ import com.digitalpersona.onetouch.verification.DPFPVerificationResult;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
+import java.awt.Color;
+import java.awt.Font;
+import java.awt.FontMetrics;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.font.FontRenderContext;
+import java.awt.print.PageFormat;
+import java.awt.print.Paper;
+import java.awt.print.Printable;
+import java.awt.print.PrinterJob;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.ReentrantLock;
+import javax.imageio.ImageIO;
+import javax.print.DocFlavor;
+import javax.print.PrintService;
+import javax.print.PrintServiceLookup;
+import javax.print.attribute.standard.Media;
+import javax.print.attribute.standard.MediaSize;
+import javax.print.attribute.standard.MediaSizeName;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class BodyEvolutionBiometria {
     private static final int PORT = 8765;
     private static final long CAPTURE_TIMEOUT_SECONDS = 40;
+    private static final int MAX_PRINT_REQUEST_BYTES = 64000;
+    private static final int RECEIPT_COPIES = 2;
     private static final ReentrantLock CAPTURE_LOCK = new ReentrantLock();
     private static final Object LISTENER_LOCK = new Object();
     private static final Object STATE_LOCK = new Object();
@@ -53,6 +77,9 @@ public final class BodyEvolutionBiometria {
     private static long sampleSeq;
     private static String lastSample;
     private static final Pattern FIELD = Pattern.compile("\"([^\"]+)\"\\s*:\\s*\"([^\"]*)\"");
+    private static final Pattern CANDIDATE = Pattern.compile("\"id\"\\s*:\\s*\"([^\"]*)\"\\s*,\\s*\"template\"\\s*:\\s*\"([^\"]*)\"");
+    private static final Pattern FIND_ALL = Pattern.compile("\"todas\"\\s*:\\s*true");
+    private static final Pattern ROLL_WIDTH = Pattern.compile("^(\\d+(?:\\.\\d+)?)\\s*\\(");
 
     private BodyEvolutionBiometria() {
     }
@@ -60,12 +87,20 @@ public final class BodyEvolutionBiometria {
     public static void main(String[] args) throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", PORT), 0);
         server.createContext("/salud", exchange -> respond(exchange, 200, salud()));
+        server.createContext("/impresora", exchange -> {
+            String printer = impresoraPredeterminada();
+            respond(exchange, printer == null ? 503 : 200, printer == null
+                ? "{\"available\":false,\"error\":\"Windows no tiene una impresora predeterminada disponible.\"}"
+                : "{\"available\":true,\"printer\":\"" + escape(printer) + "\"}");
+        });
+        server.createContext("/imprimir", BodyEvolutionBiometria::handleImpresion);
         server.createContext("/capturar", exchange -> handle(exchange, body -> exclusive(BodyEvolutionBiometria::capturar, body)));
         server.createContext("/enrolar/iniciar", exchange -> handle(exchange, BodyEvolutionBiometria::iniciarEnrolar));
         server.createContext("/enrolar/progreso", exchange -> handle(exchange, BodyEvolutionBiometria::progresoEnrolar));
         server.createContext("/enrolar/resultado", exchange -> handle(exchange, BodyEvolutionBiometria::resultadoEnrolar));
         server.createContext("/enrolar", exchange -> handle(exchange, body -> exclusive(BodyEvolutionBiometria::enrolar, body)));
         server.createContext("/verificar", exchange -> handle(exchange, BodyEvolutionBiometria::verificar));
+        server.createContext("/identificar", exchange -> handle(exchange, BodyEvolutionBiometria::identificar));
         server.createContext("/poll", exchange -> respond(exchange, 200, poll(exchange.getRequestURI().getRawQuery())));
         server.setExecutor(java.util.concurrent.Executors.newFixedThreadPool(4));
         server.start();
@@ -179,6 +214,200 @@ public final class BodyEvolutionBiometria {
         } catch (Exception | LinkageError exception) {
             return "{\"status\":\"error\",\"error\":\"" + escape(String.valueOf(exception)) + "\"}";
         }
+    }
+
+    private static String impresoraPredeterminada() {
+        PrintService printer = PrintServiceLookup.lookupDefaultPrintService();
+        return printer == null ? null : printer.getName();
+    }
+
+    private static String imprimir(String contenido) throws Exception {
+        if (!contenido.startsWith("BEG-PRINT-V1\n")) {
+            throw new IllegalArgumentException("El contenido del recibo no tiene un formato válido.");
+        }
+
+        int separator = contenido.indexOf("\n\n", "BEG-PRINT-V1\n".length());
+        if (separator < 0) {
+            throw new IllegalArgumentException("El recibo no incluye el logo.");
+        }
+
+        byte[] logoBytes;
+        try {
+            logoBytes = Base64.getDecoder().decode(contenido.substring("BEG-PRINT-V1\n".length(), separator));
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException("El logo del recibo no tiene un formato válido.", exception);
+        }
+        BufferedImage sourceLogo = ImageIO.read(new ByteArrayInputStream(logoBytes));
+        if (sourceLogo == null || sourceLogo.getWidth() <= 0 || sourceLogo.getHeight() <= 0
+            || (long) sourceLogo.getWidth() * sourceLogo.getHeight() > 2_000_000) {
+            throw new IllegalArgumentException("No se pudo leer el logo del recibo.");
+        }
+
+        String recibo = contenido.substring(separator + 2);
+        if (recibo.isBlank()) {
+            throw new IllegalArgumentException("El recibo está vacío.");
+        }
+        if (recibo.length() > 12000) {
+            throw new IllegalArgumentException("El contenido del recibo excede el límite permitido.");
+        }
+
+        PrintService printer = PrintServiceLookup.lookupDefaultPrintService();
+        if (printer == null) {
+            throw new IllegalStateException("Windows no tiene una impresora predeterminada disponible.");
+        }
+        if (!printer.isDocFlavorSupported(DocFlavor.SERVICE_FORMATTED.PRINTABLE)) {
+            throw new IllegalStateException("La impresora predeterminada no admite recibos gráficos.");
+        }
+
+        PrinterJob job = PrinterJob.getPrinterJob();
+        job.setPrintService(printer);
+
+        PageFormat page = job.defaultPage();
+        Paper defaultPaper = page.getPaper();
+        double paperWidth = widthFromDefaultMedia(printer, defaultPaper);
+        double printableWidth = printableWidthFromDefaultMedia(printer, defaultPaper);
+        double marginX = millimeters(4);
+        double marginY = millimeters(4);
+        printableWidth = Math.min(printableWidth, paperWidth - (marginX * 2));
+        if (printableWidth <= 0) {
+            throw new IllegalStateException("No se pudo determinar el ancho imprimible de la impresora.");
+        }
+
+        Font font = new Font(Font.MONOSPACED, Font.PLAIN, 9);
+        List<String> lines = wrapReceipt(recibo, font, printableWidth);
+        double lineHeight = font.getLineMetrics("Ag", new FontRenderContext(null, true, true)).getHeight() + 1;
+        BufferedImage logo = thermalLogo(sourceLogo);
+        double logoWidth = Math.min(printableWidth * 0.94, millimeters(60));
+        double logoHeight = logoWidth * logo.getHeight() / logo.getWidth();
+        double logoGap = millimeters(2);
+        double pageHeight = Math.max(
+            millimeters(50),
+            marginY + logoHeight + logoGap + (lineHeight * lines.size()) + marginY
+        );
+
+        Paper paper = new Paper();
+        paper.setSize(paperWidth, pageHeight);
+        paper.setImageableArea(marginX, marginY, printableWidth, pageHeight - (marginY * 2));
+        page.setOrientation(PageFormat.PORTRAIT);
+        page.setPaper(paper);
+        PageFormat printablePage = job.validatePage(page);
+
+        if (printablePage.getImageableHeight() < logoHeight + logoGap + (lineHeight * lines.size())) {
+            throw new IllegalStateException("El recibo excede el tamaño de papel configurado en la impresora.");
+        }
+
+        job.setPrintable((Graphics graphics, PageFormat format, int pageIndex) -> {
+            if (pageIndex >= RECEIPT_COPIES) {
+                return Printable.NO_SUCH_PAGE;
+            }
+
+            Graphics2D printerGraphics = (Graphics2D) graphics.create();
+            try {
+                printerGraphics.setColor(Color.BLACK);
+                printerGraphics.setFont(font);
+                printerGraphics.setRenderingHint(
+                    RenderingHints.KEY_INTERPOLATION,
+                    RenderingHints.VALUE_INTERPOLATION_BILINEAR
+                );
+                FontMetrics metrics = printerGraphics.getFontMetrics();
+                float x = (float) format.getImageableX();
+                double logoX = format.getImageableX() + (format.getImageableWidth() - logoWidth) / 2;
+                printerGraphics.drawImage(
+                    logo,
+                    (int) Math.round(logoX),
+                    (int) Math.round(format.getImageableY()),
+                    (int) Math.round(logoWidth),
+                    (int) Math.round(logoHeight),
+                    null
+                );
+                float y = (float) (format.getImageableY() + logoHeight + logoGap) + metrics.getAscent();
+
+                for (String line : lines) {
+                    printerGraphics.drawString(line, x, y);
+                    y += (float) lineHeight;
+                }
+
+                return Printable.PAGE_EXISTS;
+            } finally {
+                printerGraphics.dispose();
+            }
+        }, printablePage);
+
+        job.print();
+        return "{\"printed\":true,\"printer\":\"" + escape(printer.getName())
+            + "\",\"copies\":" + RECEIPT_COPIES + "}";
+    }
+
+    private static BufferedImage thermalLogo(BufferedImage source) {
+        BufferedImage logo = new BufferedImage(source.getWidth(), source.getHeight(), BufferedImage.TYPE_INT_RGB);
+
+        for (int y = 0; y < source.getHeight(); y++) {
+            for (int x = 0; x < source.getWidth(); x++) {
+                int alpha = (source.getRGB(x, y) >>> 24) & 0xFF;
+                int color = 255 - alpha;
+                logo.setRGB(x, y, (color << 16) | (color << 8) | color);
+            }
+        }
+
+        return logo;
+    }
+
+    private static double widthFromDefaultMedia(PrintService printer, Paper defaultPaper) {
+        Media media = (Media) printer.getDefaultAttributeValue(Media.class);
+        if (media instanceof MediaSizeName mediaName) {
+            Matcher matcher = ROLL_WIDTH.matcher(mediaName.toString());
+            if (matcher.find()) {
+                return millimeters(Double.parseDouble(matcher.group(1)));
+            }
+        }
+
+        return defaultPaper.getWidth();
+    }
+
+    private static double printableWidthFromDefaultMedia(PrintService printer, Paper defaultPaper) {
+        Media media = (Media) printer.getDefaultAttributeValue(Media.class);
+        if (media instanceof MediaSizeName mediaName) {
+            MediaSize mediaSize = MediaSize.getMediaSizeForName(mediaName);
+            if (mediaSize != null) {
+                return millimeters(mediaSize.getX(MediaSize.MM));
+            }
+        }
+
+        return defaultPaper.getImageableWidth();
+    }
+
+    private static List<String> wrapReceipt(String content, Font font, double width) {
+        FontRenderContext context = new FontRenderContext(null, true, true);
+        List<String> lines = new ArrayList<>();
+
+        for (String sourceLine : content.split("\\R", -1)) {
+            if (sourceLine.isEmpty()) {
+                lines.add("");
+                continue;
+            }
+
+            StringBuilder line = new StringBuilder();
+            for (int offset = 0; offset < sourceLine.length();) {
+                int codePoint = sourceLine.codePointAt(offset);
+                String character = new String(Character.toChars(codePoint));
+                String candidate = line.toString() + character;
+
+                if (!line.isEmpty() && font.getStringBounds(candidate, context).getWidth() > width) {
+                    lines.add(line.toString());
+                    line.setLength(0);
+                }
+
+                line.append(character);
+                offset += Character.charCount(codePoint);
+            }
+            lines.add(line.toString());
+        }
+
+        return lines;
+    }
+
+    private static double millimeters(double value) {
+        return value * 72.0 / 25.4;
     }
 
     private static String capturar(String body) throws Exception {
@@ -314,6 +543,42 @@ public final class BodyEvolutionBiometria {
         return "{\"matched\":" + result.isVerified() + "}";
     }
 
+    /**
+     * Identificación 1:N: extrae las características de la muestra una sola vez y la compara
+     * con cada plantilla candidata del lote. Con "todas":true no se detiene en la primera coincidencia.
+     */
+    private static String identificar(String body) throws Exception {
+        DPFPSample sample = DPFPGlobal.getSampleFactory().createSample(decode(field(body, "sample")));
+        DPFPFeatureSet features = DPFPGlobal.getFeatureExtractionFactory()
+            .createFeatureExtraction()
+            .createFeatureSet(sample, DPFPDataPurpose.DATA_PURPOSE_VERIFICATION);
+        var verification = DPFPGlobal.getVerificationFactory().createVerification();
+        boolean findAll = FIND_ALL.matcher(body).find();
+        List<String> matches = new ArrayList<>();
+        int evaluated = 0;
+        int invalid = 0;
+
+        Matcher candidates = CANDIDATE.matcher(body);
+        while (candidates.find()) {
+            try {
+                DPFPTemplate template = DPFPGlobal.getTemplateFactory()
+                    .createTemplate(decode(candidates.group(2).replace("\\/", "/")));
+                evaluated++;
+                if (verification.verify(features, template).isVerified()) {
+                    matches.add("\"" + escape(candidates.group(1)) + "\"");
+                    if (!findAll) {
+                        break;
+                    }
+                }
+            } catch (RuntimeException exception) {
+                invalid++;
+            }
+        }
+
+        return "{\"coincidencias\":[" + String.join(",", matches) + "],\"evaluadas\":" + evaluated
+            + ",\"invalidas\":" + invalid + "}";
+    }
+
     private static DPFPSample captureSampleObject(String terminal) throws Exception {
         if (!CAPTURE_LOCK.tryLock()) {
             throw new IllegalStateException("El lector está ocupado con otra captura.");
@@ -412,6 +677,31 @@ public final class BodyEvolutionBiometria {
         }
     }
 
+    private static void handleImpresion(HttpExchange exchange) throws IOException {
+        if (!"POST".equals(exchange.getRequestMethod())) {
+            respond(exchange, 405, "{\"error\":\"Use POST para enviar un recibo.\"}");
+            return;
+        }
+        if (exchange.getRequestHeaders().containsKey("Origin")) {
+            respond(exchange, 403, "{\"error\":\"La impresión solo puede solicitarse desde el servicio local.\"}");
+            return;
+        }
+
+        try {
+            byte[] content = exchange.getRequestBody().readNBytes(MAX_PRINT_REQUEST_BYTES + 1);
+            if (content.length > MAX_PRINT_REQUEST_BYTES) {
+                respond(exchange, 413, "{\"error\":\"El contenido del recibo excede el límite permitido.\"}");
+                return;
+            }
+
+            String body = new String(content, StandardCharsets.UTF_8);
+            respond(exchange, 200, imprimir(body));
+        } catch (Exception | LinkageError exception) {
+            String message = exception.getMessage() == null ? "No se pudo imprimir el recibo." : exception.getMessage();
+            respond(exchange, 422, "{\"error\":\"" + escape(message) + "\"}");
+        }
+    }
+
     private static void respond(HttpExchange exchange, int status, String body) throws IOException {
         byte[] content = body.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
@@ -423,7 +713,26 @@ public final class BodyEvolutionBiometria {
     }
 
     private static String escape(String value) {
-        return value.replace("\\", "\\\\").replace("\"", "\\\"");
+        StringBuilder escaped = new StringBuilder();
+        for (char character : value.toCharArray()) {
+            switch (character) {
+                case '\\' -> escaped.append("\\\\");
+                case '"' -> escaped.append("\\\"");
+                case '\b' -> escaped.append("\\b");
+                case '\f' -> escaped.append("\\f");
+                case '\n' -> escaped.append("\\n");
+                case '\r' -> escaped.append("\\r");
+                case '\t' -> escaped.append("\\t");
+                default -> {
+                    if (character < 0x20) {
+                        escaped.append(String.format("\\u%04x", (int) character));
+                    } else {
+                        escaped.append(character);
+                    }
+                }
+            }
+        }
+        return escaped.toString();
     }
 
     @FunctionalInterface

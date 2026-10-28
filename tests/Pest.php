@@ -1,6 +1,8 @@
 <?php
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 /*
@@ -47,4 +49,24 @@ expect()->extend('toBeOne', function () {
 function something()
 {
     // ..
+}
+
+/**
+ * Respuesta falsa de /identificar que coincide con los candidatos cuya plantilla es la indicada
+ * (o con todos, si no se indica ninguna).
+ */
+function coincidirConCandidatos(?string $plantilla = null): Closure
+{
+    return function (Request $request) use ($plantilla) {
+        $candidatos = array_filter(
+            $request['candidatos'],
+            fn (array $candidato): bool => $plantilla === null || $candidato['template'] === $plantilla,
+        );
+
+        return Http::response([
+            'coincidencias' => array_column($candidatos, 'id'),
+            'evaluadas' => count($request['candidatos']),
+            'invalidas' => 0,
+        ]);
+    };
 }

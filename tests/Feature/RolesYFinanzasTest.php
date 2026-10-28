@@ -307,3 +307,173 @@ test('el reporte separa ingresos de membresías y egresos por categoría y expor
 
     expect($csv->headers->get('content-disposition'))->toContain('reporte-financiero-'.$fecha.'-'.$fecha.'.csv');
 });
+
+test('un administrador puede crear y actualizar planes de membresía y auditar los cambios', function () {
+    $administrador = Usuario::create([
+        'name' => 'Cristian',
+        'username' => 'cristian',
+        'role' => Usuario::ROLE_ADMINISTRADOR,
+        'email' => null,
+        'password' => 'password',
+    ]);
+
+    $this->actingAs($administrador)
+        ->get('/tipos-de-membresia')
+        ->assertOk()
+        ->assertSee('Configurar membresías');
+
+    $this->post('/tipos-de-membresia', [
+        'nombre' => 'Membresía mensual',
+        'duracion_dias' => 30,
+        'precio' => '499.00',
+        'activo' => '1',
+    ])->assertRedirect('/tipos-de-membresia');
+
+    $plan = TipoMembresia::query()->where('nombre', 'Membresía mensual')->firstOrFail();
+    $this->assertModelExists($plan);
+    $this->assertDatabaseHas('registros', [
+        'usuario_id' => $administrador->id,
+        'accion' => 'tipo_membresia.creado',
+    ]);
+
+    $this->put("/tipos-de-membresia/{$plan->id}", [
+        'nombre' => 'Membresía mensual plus',
+        'duracion_dias' => 45,
+        'precio' => '599.00',
+        'activo' => '0',
+    ])
+        ->assertRedirect('/tipos-de-membresia')
+        ->assertSessionHas('success');
+
+    expect($plan->refresh()->nombre)->toBe('Membresía mensual plus');
+    expect($plan->duracion_dias)->toBe(45);
+    expect($plan->precio)->toBe('599.00');
+    expect($plan->activo)->toBeFalse();
+    $this->assertDatabaseHas('registros', [
+        'usuario_id' => $administrador->id,
+        'accion' => 'tipo_membresia.actualizado',
+    ]);
+});
+
+test('una recepcionista no puede abrir ni modificar planes de membresía', function () {
+    $recepcionista = Usuario::create([
+        'name' => 'Recepción',
+        'username' => 'recepcion',
+        'role' => Usuario::ROLE_RECEPCIONISTA,
+        'email' => null,
+        'password' => 'password',
+    ]);
+
+    $this->get('/tipos-de-membresia')->assertRedirect('/login');
+
+    $this->actingAs($recepcionista)
+        ->get('/clientes')
+        ->assertOk()
+        ->assertDontSee(route('tipos-membresia.index'), false);
+
+    $this->get('/tipos-de-membresia')
+        ->assertForbidden();
+
+    $this->post('/tipos-de-membresia', [
+        'nombre' => 'Plan no autorizado',
+        'duracion_dias' => 30,
+        'precio' => '100.00',
+        'activo' => '1',
+    ])->assertForbidden();
+
+    $this->postJson('/api/v1/planes-de-membresia', [
+        'nombre' => 'Plan no autorizado',
+        'duracion_dias' => 30,
+        'precio' => '100.00',
+        'activo' => true,
+    ])->assertForbidden();
+
+    $this->assertDatabaseCount('tipo_membresias', 0);
+});
+
+test('un administrador puede crear planes desde la API y registrar la acción', function () {
+    $administrador = Usuario::create([
+        'name' => 'Cristian',
+        'username' => 'cristian',
+        'role' => Usuario::ROLE_ADMINISTRADOR,
+        'email' => null,
+        'password' => 'password',
+    ]);
+
+    $this->actingAs($administrador)
+        ->postJson('/api/v1/planes-de-membresia', [
+            'nombre' => 'Plan API',
+            'duracion_dias' => 30,
+            'precio' => '299.00',
+        ])
+        ->assertCreated()
+        ->assertJsonPath('nombre', 'Plan API')
+        ->assertJsonPath('activo', true);
+
+    $this->assertDatabaseHas('tipo_membresias', [
+        'nombre' => 'Plan API',
+        'duracion_dias' => 30,
+        'precio' => '299.00',
+        'activo' => true,
+    ]);
+    $this->assertDatabaseHas('registros', [
+        'usuario_id' => $administrador->id,
+        'accion' => 'tipo_membresia.creado',
+    ]);
+});
+
+test('rechaza duraciones invalidas al configurar planes de membresía', function () {
+    $administrador = Usuario::create([
+        'name' => 'Cristian',
+        'username' => 'cristian',
+        'role' => Usuario::ROLE_ADMINISTRADOR,
+        'email' => null,
+        'password' => 'password',
+    ]);
+
+    $this->actingAs($administrador)
+        ->post('/tipos-de-membresia', [
+            'nombre' => 'Plan inválido',
+            'duracion_dias' => 0,
+            'precio' => '100.00',
+            'activo' => '1',
+        ])
+        ->assertSessionHasErrors('duracion_dias');
+
+    $this->assertDatabaseCount('tipo_membresias', 0);
+});
+
+test('los planes desactivados no aparecen ni se pueden renovar desde web o API', function () {
+    $recepcionista = Usuario::create([
+        'name' => 'Recepción',
+        'username' => 'recepcion',
+        'role' => Usuario::ROLE_RECEPCIONISTA,
+        'email' => null,
+        'password' => 'password',
+    ]);
+    $cliente = Cliente::create(['nombre' => 'Ana', 'apellido' => 'López']);
+    $plan = TipoMembresia::create([
+        'nombre' => 'Plan pausado',
+        'duracion_dias' => 30,
+        'precio' => 350,
+        'activo' => false,
+    ]);
+
+    $this->actingAs($recepcionista)
+        ->get('/clientes')
+        ->assertOk()
+        ->assertDontSee('Plan pausado');
+
+    $this->post("/clientes/{$cliente->id}/renovar", [
+        'tipo_membresia_id' => $plan->id,
+        'metodo_pago' => 'efectivo',
+    ])->assertSessionHasErrors('tipo_membresia_id');
+
+    $this->postJson("/api/v1/clientes/{$cliente->id}/membresias/renovar", [
+        'membership_plan_id' => $plan->id,
+        'payment_method' => 'cash',
+    ])->assertJsonValidationErrors('membership_plan_id');
+
+    expect($cliente->membresias()->exists())->toBeFalse();
+    expect($cliente->pagos()->exists())->toBeFalse();
+});

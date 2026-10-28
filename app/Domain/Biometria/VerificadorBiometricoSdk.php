@@ -6,69 +6,115 @@ use App\Models\Cliente;
 use App\Models\CredencialBiometrica;
 use App\Models\CredencialBiometricaEmpleado;
 use App\Models\Usuario;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class VerificadorBiometricoSdk implements VerificadorBiometrico
 {
     public function verificar(string $captureToken, string $terminalIdentifier): array
     {
-        $credenciales = CredencialBiometrica::query()
+        $coincidencia = null;
+
+        CredencialBiometrica::query()
             ->where('estado', true)
-            ->get();
+            ->chunkById(
+                $this->tamanoLote(),
+                function (Collection $lote) use ($captureToken, $terminalIdentifier, &$coincidencia): bool {
+                    $ids = $this->identificarLote($captureToken, $terminalIdentifier, $lote, false);
 
-        foreach ($credenciales as $credencial) {
-            $resultado = $this->solicitar('/verificar', [
-                'sample' => $captureToken,
-                'template' => $credencial->plantilla,
-                'terminal' => $terminalIdentifier,
-            ]);
+                    if ($ids === []) {
+                        return true;
+                    }
 
-            if (($resultado['matched'] ?? false) === true) {
-                return [
-                    'matched' => true,
-                    'id_cliente' => $credencial->id_cliente,
-                    'id_externo' => $credencial->id_externo,
-                ];
-            }
+                    $coincidencia = $lote->firstWhere('id', $ids[0]);
+
+                    return false;
+                },
+            );
+
+        if ($coincidencia === null) {
+            return ['matched' => false];
         }
 
-        return ['matched' => false];
+        return [
+            'matched' => true,
+            'id_cliente' => $coincidencia->id_cliente,
+            'id_externo' => $coincidencia->id_externo,
+        ];
     }
 
     public function verificarEmpleado(string $captureToken, string $terminalIdentifier): array
     {
-        $credenciales = CredencialBiometricaEmpleado::query()
+        $idsUsuario = [];
+
+        CredencialBiometricaEmpleado::query()
             ->where('estado', true)
-            ->with('usuario:id')
-            ->get();
-        $idUsuarioCoincidente = null;
+            ->chunkById(
+                $this->tamanoLote(),
+                function (Collection $lote) use ($captureToken, $terminalIdentifier, &$idsUsuario): bool {
+                    foreach ($this->identificarLote($captureToken, $terminalIdentifier, $lote, true) as $id) {
+                        $idsUsuario[(int) $lote->firstWhere('id', $id)->usuario_id] = true;
+                    }
 
-        foreach ($credenciales as $credencial) {
-            $idUsuario = (int) $credencial->usuario_id;
-            $resultado = $this->solicitar('/verificar', [
-                'sample' => $captureToken,
+                    return count($idsUsuario) < 2;
+                },
+            );
+
+        return count($idsUsuario) === 1
+            ? ['matched' => true, 'id_usuario' => array_key_first($idsUsuario)]
+            : ['matched' => false];
+    }
+
+    /**
+     * Envía el lote al puente en una sola petición y devuelve los ids de credenciales que coinciden.
+     *
+     * @param  Collection<int, CredencialBiometrica|CredencialBiometricaEmpleado>  $lote
+     * @return list<int>
+     */
+    private function identificarLote(string $muestra, string $terminalIdentifier, Collection $lote, bool $todas): array
+    {
+        $candidatos = $lote
+            ->filter(fn ($credencial): bool => is_string($credencial->plantilla) && $credencial->plantilla !== '')
+            ->map(fn ($credencial): array => [
+                'id' => (string) $credencial->getKey(),
                 'template' => $credencial->plantilla,
-                'terminal' => $terminalIdentifier,
-            ], 5);
+            ])
+            ->values()
+            ->all();
 
-            if (($resultado['matched'] ?? false) !== true) {
-                continue;
-            }
-
-            if ($idUsuarioCoincidente !== null && $idUsuarioCoincidente !== $idUsuario) {
-                return ['matched' => false];
-            }
-
-            $idUsuarioCoincidente = $idUsuario;
+        if ($candidatos === []) {
+            return [];
         }
 
-        return $idUsuarioCoincidente === null
-            ? ['matched' => false]
-            : ['matched' => true, 'id_usuario' => $idUsuarioCoincidente];
+        $resultado = $this->solicitar('/identificar', [
+            'sample' => $muestra,
+            'terminal' => $terminalIdentifier,
+            'todas' => $todas,
+            'candidatos' => $candidatos,
+        ]);
+        $coincidencias = $resultado['coincidencias'] ?? null;
+
+        if (! is_array($coincidencias)) {
+            throw new BiometriaException('El puente biométrico devolvió una identificación inválida.');
+        }
+
+        if ((int) ($resultado['invalidas'] ?? 0) > 0) {
+            Log::warning('El puente biométrico descartó plantillas inválidas durante la identificación.', [
+                'invalidas' => (int) $resultado['invalidas'],
+            ]);
+        }
+
+        return array_map('intval', $coincidencias);
+    }
+
+    private function tamanoLote(): int
+    {
+        return max(1, (int) config('biometria.lote_identificacion'));
     }
 
     public function capturar(string $terminalIdentifier): string

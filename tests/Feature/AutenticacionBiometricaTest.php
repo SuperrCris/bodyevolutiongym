@@ -13,7 +13,7 @@ test('un empleado puede iniciar sesión con su huella y queda auditado', functio
     Http::preventStrayRequests();
     Http::fake([
         'http://127.0.0.1:8765/capturar' => Http::response(['sample' => base64_encode('muestra-empleado')]),
-        'http://127.0.0.1:8765/verificar' => Http::response(['matched' => true]),
+        'http://127.0.0.1:8765/identificar' => coincidirConCandidatos(),
     ]);
 
     $empleado = Usuario::create([
@@ -37,8 +37,8 @@ test('un empleado puede iniciar sesión con su huella y queda auditado', functio
         'usuario_id' => $empleado->id,
         'accion' => 'autenticacion.huella',
     ]);
-    Http::assertSent(fn (Request $request): bool => $request->url() === 'http://127.0.0.1:8765/verificar'
-        && $request->data()['template'] === base64_encode('plantilla-empleado')
+    Http::assertSent(fn (Request $request): bool => $request->url() === 'http://127.0.0.1:8765/identificar'
+        && $request->data()['candidatos'][0]['template'] === base64_encode('plantilla-empleado')
     );
 });
 
@@ -46,7 +46,7 @@ test('no inicia sesión si la huella coincide con credenciales de empleados dist
     Http::preventStrayRequests();
     Http::fake([
         'http://127.0.0.1:8765/capturar' => Http::response(['sample' => base64_encode('muestra-ambigua')]),
-        'http://127.0.0.1:8765/verificar' => Http::response(['matched' => true]),
+        'http://127.0.0.1:8765/identificar' => coincidirConCandidatos(),
     ]);
 
     foreach (['ana', 'luis'] as $username) {
@@ -71,14 +71,14 @@ test('no inicia sesión si la huella coincide con credenciales de empleados dist
         ->assertRedirectBackWithErrors('fingerprint');
 
     $this->assertGuest();
-    Http::assertSentCount(3);
+    Http::assertSentCount(2);
 });
 
 test('rechaza una huella que no coincide con ningún empleado', function () {
     Http::preventStrayRequests();
     Http::fake([
         'http://127.0.0.1:8765/capturar' => Http::response(['sample' => base64_encode('muestra-desconocida')]),
-        'http://127.0.0.1:8765/verificar' => Http::response(['matched' => false]),
+        'http://127.0.0.1:8765/identificar' => Http::response(['coincidencias' => []]),
     ]);
 
     $empleado = Usuario::create([
@@ -106,7 +106,7 @@ test('una huella enrolada como cliente no autentica a un empleado', function () 
     Http::preventStrayRequests();
     Http::fake([
         'http://127.0.0.1:8765/capturar' => Http::response(['sample' => base64_encode('muestra-cliente')]),
-        'http://127.0.0.1:8765/verificar' => Http::response(['matched' => true]),
+        'http://127.0.0.1:8765/identificar' => coincidirConCandidatos(),
     ]);
 
     $empleado = Usuario::create([

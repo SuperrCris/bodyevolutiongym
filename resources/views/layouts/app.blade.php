@@ -20,6 +20,7 @@
                     <a href="{{ route('egresos.index') }}" class="rounded-xl px-3 py-2 transition hover:bg-white/5 hover:text-teal-200">Egresos</a>
                     <a href="{{ route('reportes.index') }}" class="rounded-xl px-3 py-2 transition hover:bg-white/5 hover:text-teal-200">Reportes</a>
                     @if (auth()->user()->esAdministrador())
+                        <a href="{{ route('tipos-membresia.index') }}" class="rounded-xl px-3 py-2 transition hover:bg-white/5 hover:text-teal-200">Membresías</a>
                         <a href="{{ route('empleados.index') }}" class="rounded-xl px-3 py-2 transition hover:bg-white/5 hover:text-teal-200">Empleados</a>
                         <a href="{{ route('registros.index') }}" class="rounded-xl px-3 py-2 transition hover:bg-white/5 hover:text-teal-200">Auditoría</a>
                     @endif

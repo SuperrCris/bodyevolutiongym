@@ -7,3 +7,37 @@
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 }
+
+@layer components {
+    .panel {
+        @apply rounded-3xl border border-white/10 bg-slate-900/70;
+    }
+
+    .field-label {
+        @apply mb-2 block text-sm font-medium text-slate-300;
+    }
+
+    .field-control {
+        @apply w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none focus:border-teal-300;
+    }
+
+    .field-control-solid {
+        @apply w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none focus:border-teal-300;
+    }
+
+    .button-primary {
+        @apply rounded-xl bg-teal-300 font-bold text-slate-950 hover:bg-teal-200;
+    }
+
+    .modal-backdrop {
+        @apply fixed inset-0 items-center justify-center p-6 backdrop-blur-sm;
+    }
+
+    .modal-panel {
+        @apply rounded-3xl border border-white/10 bg-slate-900 p-6 shadow-2xl;
+    }
+}
+
+input[type='date'] {
+    color-scheme: dark;
+}

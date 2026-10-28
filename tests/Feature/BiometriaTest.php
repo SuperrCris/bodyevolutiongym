@@ -7,6 +7,7 @@ use App\Models\CredencialBiometrica;
 use App\Models\Usuario;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 
 uses(RefreshDatabase::class);
@@ -124,7 +125,7 @@ test('registra una plantilla biométrica para un cliente', function () {
 
 test('identifica un cliente con una muestra biométrica', function () {
     Http::fake([
-        'http://127.0.0.1:8765/verificar' => Http::response(['matched' => true]),
+        'http://127.0.0.1:8765/identificar' => coincidirConCandidatos(),
     ]);
 
     $cliente = Cliente::create([
@@ -153,6 +154,82 @@ test('identifica un cliente con una muestra biométrica', function () {
             'matched' => true,
             'id_cliente' => $cliente->id,
         ]);
+});
+
+test('identifica al cliente correcto cuando la coincidencia está en un lote posterior', function () {
+    config(['biometria.lote_identificacion' => 2]);
+    Http::preventStrayRequests();
+    Http::fake([
+        'http://127.0.0.1:8765/identificar' => coincidirConCandidatos(base64_encode('plantilla-3')),
+    ]);
+
+    foreach ([1, 2, 3] as $numero) {
+        $cliente = Cliente::create(['nombre' => 'Cliente', 'apellido' => (string) $numero]);
+        $cliente->credencialesBiometricas()->create([
+            'proveedor' => 'digitalpersona',
+            'id_externo' => 'credencial-lote-'.$numero,
+            'plantilla' => base64_encode('plantilla-'.$numero),
+            'estado' => true,
+        ]);
+    }
+    $usuario = Usuario::create(['name' => 'Operador', 'email' => 'op.lote@example.com', 'password' => 'password']);
+
+    $this->actingAs($usuario)
+        ->postJson('/api/v1/biometrics/verify', ['capture_token' => base64_encode('muestra')])
+        ->assertOk()
+        ->assertJson(['matched' => true, 'id_cliente' => $cliente->id, 'id_externo' => 'credencial-lote-3']);
+
+    Http::assertSentCount(2);
+});
+
+test('deja de consultar lotes al encontrar la primera coincidencia', function () {
+    config(['biometria.lote_identificacion' => 2]);
+    Http::preventStrayRequests();
+    Http::fake([
+        'http://127.0.0.1:8765/identificar' => coincidirConCandidatos(base64_encode('plantilla-1')),
+    ]);
+
+    foreach ([1, 2, 3] as $numero) {
+        Cliente::create(['nombre' => 'Cliente', 'apellido' => (string) $numero])
+            ->credencialesBiometricas()
+            ->create([
+                'proveedor' => 'digitalpersona',
+                'id_externo' => 'credencial-corte-'.$numero,
+                'plantilla' => base64_encode('plantilla-'.$numero),
+                'estado' => true,
+            ]);
+    }
+    $usuario = Usuario::create(['name' => 'Operador', 'email' => 'op.corte@example.com', 'password' => 'password']);
+
+    $this->actingAs($usuario)
+        ->postJson('/api/v1/biometrics/verify', ['capture_token' => base64_encode('muestra')])
+        ->assertOk()
+        ->assertJson(['matched' => true, 'id_externo' => 'credencial-corte-1']);
+
+    Http::assertSentCount(1);
+});
+
+test('no coincide y omite credenciales sin plantilla ni activas', function () {
+    Http::preventStrayRequests();
+    Http::fake([
+        'http://127.0.0.1:8765/identificar' => Http::response(['coincidencias' => [], 'evaluadas' => 1, 'invalidas' => 0]),
+    ]);
+
+    $cliente = Cliente::create(['nombre' => 'Luis', 'apellido' => 'Pérez']);
+    $cliente->credencialesBiometricas()->createMany([
+        ['proveedor' => 'digitalpersona', 'id_externo' => 'sin-plantilla', 'plantilla' => null, 'estado' => true],
+        ['proveedor' => 'digitalpersona', 'id_externo' => 'inactiva', 'plantilla' => base64_encode('vieja'), 'estado' => false],
+        ['proveedor' => 'digitalpersona', 'id_externo' => 'activa', 'plantilla' => base64_encode('vigente'), 'estado' => true],
+    ]);
+    $usuario = Usuario::create(['name' => 'Operador', 'email' => 'op.sin@example.com', 'password' => 'password']);
+
+    $this->actingAs($usuario)
+        ->postJson('/api/v1/biometrics/verify', ['capture_token' => base64_encode('muestra')])
+        ->assertOk()
+        ->assertExactJson(['matched' => false]);
+
+    Http::assertSent(fn (Request $request): bool => count($request['candidatos']) === 1
+        && $request['candidatos'][0]['template'] === base64_encode('vigente'));
 });
 
 test('actualizar la huella desactiva la credencial anterior', function () {
@@ -187,7 +264,7 @@ test('actualizar la huella desactiva la credencial anterior', function () {
 test('el sondeo continuo identifica al cliente y devuelve su membresía', function () {
     Http::fake([
         'http://127.0.0.1:8765/poll*' => Http::response(['seq' => 4, 'sample' => base64_encode('muestra')]),
-        'http://127.0.0.1:8765/verificar' => Http::response(['matched' => true]),
+        'http://127.0.0.1:8765/identificar' => coincidirConCandidatos(),
     ]);
 
     $cliente = Cliente::create(['nombre' => 'Ana', 'apellido' => 'Gómez', 'email' => 'ana.scan@example.com']);

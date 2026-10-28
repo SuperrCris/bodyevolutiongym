@@ -6,8 +6,7 @@
     <div class="space-y-6">
         <div>
             <p class="text-sm font-semibold uppercase tracking-[0.2em] text-teal-300">Administración</p>
-            <h1 class="mt-2 text-3xl font-black text-white">Auditoría del sistema</h1>
-            <p class="mt-2 text-sm text-slate-400">Revisa quién realizó cada operación y cuándo ocurrió.</p>
+            <h1 class="mt-2 text-3xl font-black text-white">Auditoría</h1>
         </div>
 
         <form method="GET" action="{{ route('registros.index') }}" class="flex flex-wrap items-end gap-3 rounded-2xl border border-white/10 bg-slate-900/70 p-4">
@@ -26,7 +25,7 @@
             <button class="rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/15">Filtrar</button>
         </form>
 
-        <section class="overflow-hidden rounded-3xl border border-white/10 bg-slate-900/70 shadow-xl">
+        <section class="panel overflow-hidden shadow-xl">
             <div class="overflow-x-auto">
                 <table class="w-full min-w-[800px] text-left text-sm">
                     <thead class="bg-white/5 text-xs uppercase tracking-wide text-slate-400">

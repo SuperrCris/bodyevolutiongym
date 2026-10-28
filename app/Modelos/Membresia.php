@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 #[Fillable(['id_cliente', 'tipo_membresia_id', 'comienzo', 'finalizacion', 'estado'])]
 class Membresia extends Model
@@ -38,5 +39,10 @@ class Membresia extends Model
     public function pagos(): HasMany
     {
         return $this->hasMany(Pago::class, 'membresia_id');
+    }
+
+    public function registrosAuditoria(): MorphMany
+    {
+        return $this->morphMany(Registros::class, 'registro', 'tipo', 'id_registro');
     }
 }

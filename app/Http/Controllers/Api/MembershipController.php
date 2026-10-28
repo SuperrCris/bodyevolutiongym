@@ -8,13 +8,18 @@ use App\Models\Cliente;
 use App\Models\TipoMembresia;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class MembershipController extends Controller
 {
     public function renew(Request $request, Cliente $customer, MembresiasServicio $service): JsonResponse
     {
         $data = $request->validate([
-            'membership_plan_id' => ['required', 'integer', 'exists:tipo_membresias,id'],
+            'membership_plan_id' => [
+                'required',
+                'integer',
+                Rule::exists('tipo_membresias', 'id')->where('activo', true),
+            ],
             'payment_method' => ['required', 'string', 'in:cash,card,transfer'],
             'reference' => ['nullable', 'string', 'max:100', 'unique:pagos,referencia'],
         ]);

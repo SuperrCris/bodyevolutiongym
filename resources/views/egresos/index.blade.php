@@ -1,25 +1,23 @@
 @extends('layouts.app')
 
-@section('title', 'Egresos | Body Evolution Gym')
+@section('title', 'Salidas | Body Evolution Gym')
 
 @section('content')
     <div class="space-y-6">
         <div>
-            <p class="text-sm font-semibold uppercase tracking-[0.2em] text-teal-300">Finanzas</p>
             <h1 class="mt-2 text-3xl font-black text-white">Registrar egreso</h1>
-            <p class="mt-2 text-sm text-slate-400">Recepcionistas y administradores pueden registrar gastos del gimnasio.</p>
         </div>
 
-        <section class="rounded-3xl border border-white/10 bg-slate-900/70 p-5 shadow-xl sm:p-7">
+        <section class="panel p-5 shadow-xl sm:p-7">
             <form method="POST" action="{{ route('egresos.store') }}" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 @csrf
                 <label class="block md:col-span-2">
-                    <span class="mb-2 block text-sm font-medium text-slate-300">Concepto</span>
-                    <input name="concepto" value="{{ old('concepto') }}" required maxlength="160" class="w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none focus:border-teal-300" placeholder="Ej. Compra de artículos de limpieza">
+                    <span class="field-label">Concepto</span>
+                    <input name="concepto" value="{{ old('concepto') }}" required maxlength="160" class="field-control" placeholder="Ej. Compra de artículos de limpieza">
                 </label>
                 <label class="block">
-                    <span class="mb-2 block text-sm font-medium text-slate-300">Categoría</span>
-                    <input name="categoria" value="{{ old('categoria') }}" required maxlength="80" list="categorias-egreso" class="w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none focus:border-teal-300" placeholder="Ej. Servicios">
+                    <span class="field-label">Categoría</span>
+                    <input name="categoria" value="{{ old('categoria') }}" required maxlength="80" list="categorias-egreso" class="field-control" placeholder="Ej. Servicios">
                     <datalist id="categorias-egreso">
                         <option value="Servicios"></option>
                         <option value="Mantenimiento"></option>
@@ -29,16 +27,16 @@
                     </datalist>
                 </label>
                 <label class="block">
-                    <span class="mb-2 block text-sm font-medium text-slate-300">Monto</span>
-                    <input type="number" name="monto" value="{{ old('monto') }}" required min="0.01" max="99999999.99" step="0.01" class="w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none focus:border-teal-300">
+                    <span class="field-label">Monto</span>
+                    <input type="number" name="monto" value="{{ old('monto') }}" required min="0.01" max="99999999.99" step="0.01" class="field-control">
                 </label>
                 <label class="block">
-                    <span class="mb-2 block text-sm font-medium text-slate-300">Fecha</span>
-                    <input type="date" name="fecha" value="{{ old('fecha', now()->toDateString()) }}" required class="w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none focus:border-teal-300">
+                    <span class="field-label">Fecha</span>
+                    <input type="date" name="fecha" value="{{ old('fecha', now()->toDateString()) }}" required class="field-control">
                 </label>
                 <label class="block">
-                    <span class="mb-2 block text-sm font-medium text-slate-300">Método de pago</span>
-                    <select name="metodo_pago" class="w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none focus:border-teal-300">
+                    <span class="field-label">Método de pago</span>
+                    <select name="metodo_pago" class="field-control">
                         <option value="">No especificado</option>
                         <option value="efectivo">Efectivo</option>
                         <option value="tarjeta">Tarjeta</option>
@@ -47,16 +45,16 @@
                     </select>
                 </label>
                 <label class="block">
-                    <span class="mb-2 block text-sm font-medium text-slate-300">Referencia (opcional)</span>
-                    <input name="referencia" value="{{ old('referencia') }}" maxlength="100" class="w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none focus:border-teal-300">
+                    <span class="field-label">Referencia (opcional)</span>
+                    <input name="referencia" value="{{ old('referencia') }}" maxlength="100" class="field-control">
                 </label>
                 <div class="md:col-span-2 xl:col-span-3">
-                    <button class="rounded-xl bg-teal-300 px-5 py-3 font-bold text-slate-950 transition hover:bg-teal-200">Guardar egreso</button>
+                    <button class="button-primary px-5 py-3 transition">Guardar egreso</button>
                 </div>
             </form>
         </section>
 
-        <section class="overflow-hidden rounded-3xl border border-white/10 bg-slate-900/70 shadow-xl">
+        <section class="panel overflow-hidden shadow-xl">
             <div class="border-b border-white/10 px-5 py-4 sm:px-7">
                 <h2 class="font-bold text-white">Movimientos recientes</h2>
             </div>
