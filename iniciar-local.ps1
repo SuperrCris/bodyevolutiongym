@@ -5,7 +5,7 @@ $principal = New-Object Security.Principal.WindowsPrincipal($identidad)
 
 if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     $scriptPath = $PSCommandPath
-    $arguments = '-NoProfile -ExecutionPolicy Bypass -File "{0}"' -f $scriptPath
+    $arguments = '-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "{0}"' -f $scriptPath
 
     try {
         Start-Process -FilePath (Join-Path $PSHOME 'powershell.exe') -Verb RunAs -ArgumentList $arguments | Out-Null
@@ -125,21 +125,26 @@ foreach ($requiredFile in @($bridgeScript, $compileScript)) {
 Write-Host 'Deteniendo el servidor local anterior del proyecto, si existe...'
 Stop-ProjectProcesses -ArtisanPath $artisan
 
-Write-Host "Reiniciando el servicio $sqlServerService..."
-$service = Get-Service -Name $sqlServerService -ErrorAction Stop
+$service = Get-Service -Name $sqlServerService -ErrorAction SilentlyContinue
 
-if ($service.Status -eq [System.ServiceProcess.ServiceControllerStatus]::Running) {
-    Restart-Service -Name $sqlServerService -ErrorAction Stop
+if ($null -eq $service) {
+    Write-Host "No se encontró $sqlServerService. Se continuará con la conexión configurada en .env."
 } else {
-    Start-Service -Name $sqlServerService -ErrorAction Stop
-}
+    Write-Host "Reiniciando el servicio $sqlServerService..."
 
-$service = Get-Service -Name $sqlServerService -ErrorAction Stop
-$service.WaitForStatus(
-    [System.ServiceProcess.ServiceControllerStatus]::Running,
-    [TimeSpan]::FromSeconds(60)
-)
-Write-Host 'SQL Server Express está en ejecución.'
+    if ($service.Status -eq [System.ServiceProcess.ServiceControllerStatus]::Running) {
+        Restart-Service -Name $sqlServerService -ErrorAction Stop
+    } else {
+        Start-Service -Name $sqlServerService -ErrorAction Stop
+    }
+
+    $service = Get-Service -Name $sqlServerService -ErrorAction Stop
+    $service.WaitForStatus(
+        [System.ServiceProcess.ServiceControllerStatus]::Running,
+        [TimeSpan]::FromSeconds(60)
+    )
+    Write-Host 'SQL Server Express está en ejecución.'
+}
 
 Write-Host 'Compilando el puente Java...'
 & $compileScript
@@ -148,7 +153,7 @@ Write-Host 'Reiniciando el puente Java...'
 Stop-BiometricBridge
 $bridgeWindow = Start-Process `
     -FilePath (Join-Path $PSHOME 'powershell.exe') `
-    -ArgumentList @('-NoExit', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$bridgeScript`"") `
+    -ArgumentList @('-NoExit', '-NoProfile', '-WindowStyle', 'Hidden', '-ExecutionPolicy', 'Bypass', '-File', "`"$bridgeScript`"") `
     -WorkingDirectory $bridgeWorkingDirectory `
     -PassThru
 

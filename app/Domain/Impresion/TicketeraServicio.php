@@ -70,7 +70,7 @@ class TicketeraServicio
         }
 
         $lineas = [
-            'BODY EVOLUTION GYM 3'.'?n',
+            'BODY EVOLUTION GYM'.'?n',
             'JOSE ROSARIO GUTIERREZ MELENDEZ',
             'GUMR790402B66',
             '6421095410',
