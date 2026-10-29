@@ -1,25 +1,52 @@
-<form method="POST" action="{{ $action }}" enctype="multipart/form-data" class="mt-6 space-y-4">
+@php($fotoInputId = 'foto-cliente-'.($cliente?->id ?? 'nuevo'))
+<form method="POST" action="{{ $action }}" enctype="multipart/form-data" class="mt-6 space-y-5">
     @csrf
     @if ($method !== 'POST') @method($method) @endif
+    <div class="space-y-2">
+        <span class="block text-center text-sm font-semibold text-slate-300">Foto</span>
+        <div class="flex items-center justify-center gap-4">
+            <button type="button" data-open-camera aria-label="Tomar foto con la cámara" class="grid size-11 shrink-0 place-items-center rounded-full border border-indigo-300/40 bg-indigo-300/10 text-indigo-200 transition hover:border-indigo-200 hover:bg-indigo-300/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-200">
+                <svg class="size-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M4 7.5h3l1.5-2h7l1.5 2h3A1.5 1.5 0 0 1 21.5 9v9a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 18V9A1.5 1.5 0 0 1 4 7.5Z" stroke="currentColor" stroke-linejoin="round" stroke-width="1.7" />
+                    <circle cx="12" cy="13" r="3.5" stroke="currentColor" stroke-width="1.7" />
+                </svg>
+            </button>
+            <div class="grid size-36 shrink-0 place-items-center overflow-hidden rounded-full border-[3px] border-teal-300 bg-slate-950/70">
+                <svg data-foto-placeholder class="{{ $cliente?->foto ? 'hidden' : '' }} size-20 text-slate-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="currentColor" aria-hidden="true">
+                    <circle cx="24" cy="15" r="10" />
+                    <path d="M5 43c0-9.4 8.5-16 19-16s19 6.6 19 16v2H5v-2Z" />
+                </svg>
+                <img data-foto-preview src="{{ $cliente?->foto ? asset('storage/'.$cliente->foto) : '' }}" alt="Foto del cliente" class="{{ $cliente?->foto ? '' : 'hidden' }} size-full object-cover">
+            </div>
+            <input id="{{ $fotoInputId }}" type="file" name="foto" accept="image/jpeg,image/png,image/webp" data-foto-input class="peer sr-only">
+            <label for="{{ $fotoInputId }}" aria-label="Elegir foto desde archivos" title="Elegir foto desde archivos" class="grid size-11 shrink-0 cursor-pointer place-items-center rounded-full border border-teal-300/40 bg-teal-300/10 text-teal-200 transition hover:border-teal-200 hover:bg-teal-300/15 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-teal-200">
+                <svg class="size-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M13.5 3.5H6A1.5 1.5 0 0 0 4.5 5v14A1.5 1.5 0 0 0 6 20.5h12a1.5 1.5 0 0 0 1.5-1.5V9l-6-5.5Z" stroke="currentColor" stroke-linejoin="round" stroke-width="1.7" />
+                    <path d="M13 4v5h5M7.5 16l2.5-2.5 2 2 1.5-1.5 3 3" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" />
+                </svg>
+            </label>
+        </div>
+        <p class="text-center text-xs text-slate-400">Usa la cámara o elige una imagen. Máximo 5 MB.</p>
+    </div>
     <div class="grid gap-4 sm:grid-cols-2">
-        @foreach (['nombre' => 'Nombre', 'apellido' => 'Apellido', 'email' => 'Correo', 'telefono' => 'Teléfono', 'fecha_nacimiento' => 'Fecha de nacimiento'] as $field => $label)
-            <label class="block {{ $field === 'email' ? 'sm:col-span-2' : '' }}">
+        @foreach (['nombre' => 'Nombre', 'apellido' => 'Apellido', 'email' => 'Correo', 'telefono' => 'Teléfono', 'documento' => 'Documento', 'direccion' => 'Dirección', 'fecha_nacimiento' => 'Fecha de nacimiento'] as $field => $label)
+            <label class="block {{ in_array($field, ['email', 'direccion']) ? 'sm:col-span-2' : '' }}">
                 <span class="mb-1.5 block text-sm font-semibold text-slate-300">{{ $label }}</span>
                 <input type="{{ $field === 'email' ? 'email' : ($field === 'fecha_nacimiento' ? 'date' : ($field === 'foto' ? 'file' : 'text')) }}" name="{{ $field }}" value="{{ old($field, $cliente?->{$field}) }}" class="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-3 text-sm outline-none focus:border-teal-300/60" {{ in_array($field, ['nombre', 'apellido']) ? 'required' : '' }}>
             </label>
         @endforeach
-        <label class="block sm:col-span-2">
-            <span class="mb-1.5 block text-sm font-semibold text-slate-300">Foto del cliente</span>
-            <div class="flex flex-col gap-3 sm:flex-row">
-                <input type="file" name="foto" accept="image/jpeg,image/png,image/webp" data-foto-input class="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/5 px-3.5 py-3 text-sm outline-none file:mr-3 file:rounded-lg file:border-0 file:bg-teal-300 file:px-3 file:py-2 file:font-semibold file:text-slate-950 focus:border-teal-300/60">
-                <button type="button" data-open-camera class="shrink-0 rounded-xl border border-indigo-300/40 px-4 py-3 text-sm font-semibold text-indigo-200 hover:border-indigo-200">Abrir cámara</button>
-            </div>
-            <p class="mt-1 text-xs text-slate-400">Elige una imagen o usa la cámara para capturarla. Máximo 5 MB.</p>
-            <img data-foto-preview src="{{ $cliente?->foto ? asset('storage/'.$cliente->foto) : '' }}" alt="Vista previa de la foto del cliente" class="{{ $cliente?->foto ? '' : 'hidden' }} mt-3 h-24 w-24 rounded-2xl object-cover ring-1 ring-white/10">
-        </label>
     </div>
     @if ($cliente === null)
-        <button type="submit" name="registrar_huella_despues" value="1" class="w-full rounded-xl border border-indigo-300/40 px-4 py-3 font-bold text-indigo-200 hover:border-indigo-200 hover:bg-indigo-300/10">Guardar y registrar huella</button>
+        <div class="grid gap-3 sm:grid-cols-2">
+            <button type="submit" class="w-full rounded-xl border border-indigo-300/40 px-4 py-3 text-sm font-bold text-indigo-200 transition hover:border-indigo-200 hover:bg-indigo-300/10">Guardar cliente</button>
+            <button type="submit" name="registrar_huella_despues" value="1" class="button-primary w-full px-4 py-3">Guardar y asignar huella</button>
+        </div>
+    @else
+        @include('clientes.partials.enrolar-huella', [
+            'clienteId' => $cliente->id,
+            'tieneHuella' => $tieneHuella ?? false,
+            'requiereGuardar' => false,
+        ])
+        <button type="submit" class="button-primary w-full px-4 py-3">Guardar cliente</button>
     @endif
-    <button type="submit" class="button-primary w-full px-4 py-3">Guardar cliente</button>
 </form>

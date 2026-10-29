@@ -31,9 +31,10 @@ class CustomerController extends Controller
         $data = $request->validate([
             'nombre' => ['required', 'string', 'max:100'],
             'apellido' => ['required', 'string', 'max:100'],
-            'email' => ['nullable', 'email', 'max:255', 'unique:clientes,email'],
+            'email' => ['nullable', 'email', 'max:255'],
             'telefono' => ['nullable', 'string', 'max:30'],
-            'documento' => ['nullable', 'string', 'max:50', 'unique:clientes,documento'],
+            'documento' => ['nullable', 'string', 'max:50'],
+            'direccion' => ['nullable', 'string', 'max:255'],
             'fecha_nacimiento' => ['nullable', 'date'],
         ]);
         $customer = Cliente::create($data);

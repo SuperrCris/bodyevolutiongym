@@ -34,6 +34,9 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/egresos', [EgresosController::class, 'store'])->name('egresos.store');
         Route::get('/reportes', [ReportesController::class, 'index'])->name('reportes.index');
         Route::get('/reportes/csv', [ReportesController::class, 'exportar'])->name('reportes.csv');
+        Route::get('/reportes/excel', [ReportesController::class, 'exportarExcel'])->name('reportes.excel');
+        Route::post('/reportes/ajustes', [ReportesController::class, 'guardarAjustes'])
+            ->name('reportes.ajustes');
     });
 
     Route::middleware('rol:administrador')->group(function (): void {

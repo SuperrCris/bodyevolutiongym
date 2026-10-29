@@ -9,15 +9,19 @@ use Illuminate\Support\Str;
 
 class TicketeraServicio
 {
-    public function imprimir(Pago $pago): string
+    public function imprimir(Pago $pago, int $copias = 2): string
     {
+        if (! in_array($copias, [1, 2], true)) {
+            throw new TicketeraException('La cantidad de tickets solicitada no es válida.');
+        }
+
         $pago->loadMissing(['cliente', 'membresia.plan', 'usuario']);
 
         try {
             $respuesta = Http::acceptJson()
                 ->connectTimeout((int) config('biometria.connect_timeout'))
                 ->timeout((int) config('biometria.print_timeout'))
-                ->withBody($this->contenido($pago), 'text/plain; charset=UTF-8')
+                ->withBody($this->contenido($pago, $copias), 'text/plain; charset=UTF-8')
                 ->post(rtrim((string) config('biometria.url'), '/').'/imprimir');
         } catch (ConnectionException $exception) {
             throw new TicketeraException(
@@ -40,14 +44,18 @@ class TicketeraServicio
             throw new TicketeraException('El puente local no confirmó el envío del recibo a la impresora.');
         }
 
-        if ($respuesta->json('copies') !== 2) {
-            throw new TicketeraException('El puente local no confirmó la impresión de dos recibos en un solo trabajo.');
+        if ($respuesta->json('copies') !== $copias) {
+            $mensaje = $copias === 1
+                ? 'El puente local no confirmó la impresión de un ticket en un solo trabajo.'
+                : 'El puente local no confirmó la impresión de dos recibos en un solo trabajo.';
+
+            throw new TicketeraException($mensaje);
         }
 
         return $impresora;
     }
 
-    private function contenido(Pago $pago): string
+    private function contenido(Pago $pago, int $copias): string
     {
         $rutaLogo = public_path('images/logo.png');
 
@@ -62,24 +70,25 @@ class TicketeraServicio
         }
 
         $lineas = [
-            'BODY EVOLUTION GYM 3',
+            'BODY EVOLUTION GYM 3'.'?n',
             'JOSE ROSARIO GUTIERREZ MELENDEZ',
             'GUMR790402B66',
             '6421095410',
             str_repeat('-', 32),
+            'Cliente: #'.$pago->cliente?->id.' •  '.Str::squish(trim(($pago->cliente?->nombre ?? '').' '.($pago->cliente?->apellido ?? ''))),
+            'Membresia '.Str::lower(Str::squish($pago->membresia?->plan?->nombre ?? '—')),
+            'Desde: '.$pago->membresia?->comienzo?->format('d/m/Y'),
+            'Hasta: '.$pago->membresia?->finalizacion?->format('d/m/Y'),
+            '',
             'Folio: #'.$pago->id,
             'Fecha: '.$pago->created_at?->format('d/m/Y H:i'),
             'Atendió: '.Str::squish($pago->usuario?->name ?? '—'),
             '',
-            'Cliente: '.Str::squish(trim(($pago->cliente?->nombre ?? '').' '.($pago->cliente?->apellido ?? ''))),
-            'Tipo: '.Str::squish($pago->membresia?->plan?->nombre ?? '—'),
-            'Desde: '.$pago->membresia?->comienzo?->format('d/m/Y'),
-            'Hasta: '.$pago->membresia?->finalizacion?->format('d/m/Y'),
-            '',
-            'Método: '.match ($pago->metodo_pago) {
-                'cash' => 'Efectivo',
-                'card' => 'Tarjeta',
-                'transfer' => 'Transferencia',
+
+            ''.match ($pago->metodo_pago) {
+                'cash' => 'En efectivo',
+                'card' => 'Con tarjeta bancaria',
+                'transfer' => 'Con transferencia',
                 default => Str::squish($pago->metodo_pago),
             },
         ];
@@ -93,6 +102,6 @@ class TicketeraServicio
         $lineas[] = '';
         $lineas[] = '¡Gracias por tu preferencia!';
 
-        return "BEG-PRINT-V1\n".base64_encode($logo)."\n\n".implode("\n", $lineas)."\n";
+        return "BEG-PRINT-V2\n{$copias}\n".base64_encode($logo)."\n\n".implode("\n", $lineas)."\n";
     }
 }

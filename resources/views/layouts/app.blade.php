@@ -17,7 +17,6 @@
                 </a>
                 <nav class="flex flex-wrap items-center gap-2 text-sm text-slate-300">
                     <a href="{{ route('clientes.index') }}" class="rounded-xl px-3 py-2 transition hover:bg-white/5 hover:text-teal-200">Clientes</a>
-                    <a href="{{ route('egresos.index') }}" class="rounded-xl px-3 py-2 transition hover:bg-white/5 hover:text-teal-200">Egresos</a>
                     <a href="{{ route('reportes.index') }}" class="rounded-xl px-3 py-2 transition hover:bg-white/5 hover:text-teal-200">Reportes</a>
                     @if (auth()->user()->esAdministrador())
                         <a href="{{ route('tipos-membresia.index') }}" class="rounded-xl px-3 py-2 transition hover:bg-white/5 hover:text-teal-200">Membresías</a>
@@ -54,21 +53,27 @@
             @yield('content')
         </main>
     </div>
-    <div id="toastHuella" class="pointer-events-none fixed right-6 top-6 z-50 flex w-80 flex-col gap-3"></div>
+    <div
+        id="toastHuella"
+        data-clientes-url="{{ route('clientes.index') }}"
+        aria-live="polite"
+        aria-relevant="additions"
+        class="fixed bottom-4 left-4 z-50 flex max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] flex-col justify-end gap-3 overflow-y-auto sm:bottom-6 sm:left-6 sm:w-96"
+    ></div>
     <script>
         (() => {
             const contenedor = document.getElementById('toastHuella');
             let ultimo = null;
             let caido = false;
 
-            function mostrar(titulo, detalle, tono) {
+            function mostrar(titulo, detalle, tono, clienteId = null) {
                 const estilos = {
                     ok: 'border-teal-300/30 bg-teal-950/95 text-teal-100',
                     aviso: 'border-amber-300/30 bg-amber-950/95 text-amber-100',
                     error: 'border-rose-300/30 bg-rose-950/95 text-rose-100',
                 };
                 const toast = document.createElement('div');
-                toast.className = `pointer-events-auto rounded-2xl border px-4 py-3 shadow-2xl backdrop-blur transition ${estilos[tono]}`;
+                toast.className = `animate-[toast-rise_180ms_ease-out] motion-reduce:animate-none rounded-2xl border px-4 py-3 shadow-2xl backdrop-blur transition ${estilos[tono]}`;
                 const t = document.createElement('p');
                 t.className = 'font-semibold';
                 t.textContent = titulo;
@@ -79,8 +84,22 @@
                     d.textContent = detalle;
                     toast.appendChild(d);
                 }
+                if (clienteId !== null) {
+                    const destinoRenovacion = new URL(contenedor.dataset.clientesUrl, window.location.origin);
+                    destinoRenovacion.searchParams.set('abrir_renovacion', clienteId);
+
+                    const acciones = document.createElement('div');
+                    acciones.className = 'mt-3 flex justify-end';
+                    const renovar = document.createElement('a');
+                    renovar.href = destinoRenovacion.toString();
+                    renovar.className = 'rounded-lg bg-teal-300 px-4 py-2 text-sm font-bold text-slate-950 transition hover:bg-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-200';
+                    renovar.textContent = 'Renovar';
+                    acciones.appendChild(renovar);
+                    toast.appendChild(acciones);
+                }
                 contenedor.appendChild(toast);
-                setTimeout(() => toast.remove(), 6000);
+                contenedor.scrollTop = contenedor.scrollHeight;
+                setTimeout(() => toast.remove(), 20000);
             }
 
             let ocupado = false;
@@ -99,9 +118,9 @@
                     if (!datos.matched) {
                         mostrar('Huella no registrada', 'No coincide con ningún cliente.', 'error');
                     } else if (datos.cliente.vigente) {
-                        mostrar(datos.cliente.nombre, `${datos.cliente.plan ?? 'Plan activo'} · vence ${datos.cliente.vence}`, 'ok');
+                        mostrar(datos.cliente.nombre, `${datos.cliente.plan ?? 'Plan activo'} · vence ${datos.cliente.vence}`, 'ok', datos.cliente.id);
                     } else {
-                        mostrar(datos.cliente.nombre, 'Membresía vencida o sin plan activo.', 'aviso');
+                        mostrar(datos.cliente.nombre, 'Membresía vencida o sin plan activo.', 'aviso', datos.cliente.id);
                     }
                 } catch (error) {
                     if (!caido) mostrar('Lector sin conexión', error.message, 'error');

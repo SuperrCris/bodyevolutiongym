@@ -60,7 +60,11 @@ public final class BodyEvolutionBiometria {
     private static final int PORT = 8765;
     private static final long CAPTURE_TIMEOUT_SECONDS = 40;
     private static final int MAX_PRINT_REQUEST_BYTES = 64000;
-    private static final int RECEIPT_COPIES = 2;
+    private static final int DEFAULT_RECEIPT_COPIES = 2;
+    private static final int MAX_RECEIPT_COPIES = 2;
+    private static final String RECEIPT_HEADER_V1 = "BEG-PRINT-V1\n";
+    private static final String RECEIPT_HEADER_V2 = "BEG-PRINT-V2\n";
+    private static final String BOLD_MARKER = "?n";
     private static final ReentrantLock CAPTURE_LOCK = new ReentrantLock();
     private static final Object LISTENER_LOCK = new Object();
     private static final Object STATE_LOCK = new Object();
@@ -80,6 +84,9 @@ public final class BodyEvolutionBiometria {
     private static final Pattern CANDIDATE = Pattern.compile("\"id\"\\s*:\\s*\"([^\"]*)\"\\s*,\\s*\"template\"\\s*:\\s*\"([^\"]*)\"");
     private static final Pattern FIND_ALL = Pattern.compile("\"todas\"\\s*:\\s*true");
     private static final Pattern ROLL_WIDTH = Pattern.compile("^(\\d+(?:\\.\\d+)?)\\s*\\(");
+
+    private record ReceiptLine(String text, boolean bold) {
+    }
 
     private BodyEvolutionBiometria() {
     }
@@ -222,18 +229,40 @@ public final class BodyEvolutionBiometria {
     }
 
     private static String imprimir(String contenido) throws Exception {
-        if (!contenido.startsWith("BEG-PRINT-V1\n")) {
+        int logoStart;
+        int copies;
+
+        if (contenido.startsWith(RECEIPT_HEADER_V2)) {
+            int copiesEnd = contenido.indexOf('\n', RECEIPT_HEADER_V2.length());
+            if (copiesEnd < 0) {
+                throw new IllegalArgumentException("El recibo no incluye la cantidad de tickets.");
+            }
+
+            try {
+                copies = Integer.parseInt(contenido.substring(RECEIPT_HEADER_V2.length(), copiesEnd));
+            } catch (NumberFormatException exception) {
+                throw new IllegalArgumentException("La cantidad de tickets no tiene un formato válido.", exception);
+            }
+
+            if (copies < 1 || copies > MAX_RECEIPT_COPIES) {
+                throw new IllegalArgumentException("La cantidad de tickets solicitada no es válida.");
+            }
+            logoStart = copiesEnd + 1;
+        } else if (contenido.startsWith(RECEIPT_HEADER_V1)) {
+            copies = DEFAULT_RECEIPT_COPIES;
+            logoStart = RECEIPT_HEADER_V1.length();
+        } else {
             throw new IllegalArgumentException("El contenido del recibo no tiene un formato válido.");
         }
 
-        int separator = contenido.indexOf("\n\n", "BEG-PRINT-V1\n".length());
+        int separator = contenido.indexOf("\n\n", logoStart);
         if (separator < 0) {
             throw new IllegalArgumentException("El recibo no incluye el logo.");
         }
 
         byte[] logoBytes;
         try {
-            logoBytes = Base64.getDecoder().decode(contenido.substring("BEG-PRINT-V1\n".length(), separator));
+            logoBytes = Base64.getDecoder().decode(contenido.substring(logoStart, separator));
         } catch (IllegalArgumentException exception) {
             throw new IllegalArgumentException("El logo del recibo no tiene un formato válido.", exception);
         }
@@ -274,8 +303,13 @@ public final class BodyEvolutionBiometria {
         }
 
         Font font = new Font(Font.MONOSPACED, Font.PLAIN, 9);
-        List<String> lines = wrapReceipt(recibo, font, printableWidth);
-        double lineHeight = font.getLineMetrics("Ag", new FontRenderContext(null, true, true)).getHeight() + 1;
+        Font boldFont = font.deriveFont(Font.BOLD);
+        List<ReceiptLine> lines = wrapReceipt(recibo, font, boldFont, printableWidth);
+        FontRenderContext fontRenderContext = new FontRenderContext(null, true, true);
+        double lineHeight = Math.max(
+            font.getLineMetrics("Ag", fontRenderContext).getHeight(),
+            boldFont.getLineMetrics("Ag", fontRenderContext).getHeight()
+        ) + 1;
         BufferedImage logo = thermalLogo(sourceLogo);
         double logoWidth = Math.min(printableWidth * 0.94, millimeters(60));
         double logoHeight = logoWidth * logo.getHeight() / logo.getWidth();
@@ -297,7 +331,7 @@ public final class BodyEvolutionBiometria {
         }
 
         job.setPrintable((Graphics graphics, PageFormat format, int pageIndex) -> {
-            if (pageIndex >= RECEIPT_COPIES) {
+            if (pageIndex >= copies) {
                 return Printable.NO_SUCH_PAGE;
             }
 
@@ -322,8 +356,9 @@ public final class BodyEvolutionBiometria {
                 );
                 float y = (float) (format.getImageableY() + logoHeight + logoGap) + metrics.getAscent();
 
-                for (String line : lines) {
-                    printerGraphics.drawString(line, x, y);
+                for (ReceiptLine line : lines) {
+                    printerGraphics.setFont(line.bold() ? boldFont : font);
+                    printerGraphics.drawString(line.text(), x, y);
                     y += (float) lineHeight;
                 }
 
@@ -335,7 +370,7 @@ public final class BodyEvolutionBiometria {
 
         job.print();
         return "{\"printed\":true,\"printer\":\"" + escape(printer.getName())
-            + "\",\"copies\":" + RECEIPT_COPIES + "}";
+            + "\",\"copies\":" + copies + "}";
     }
 
     private static BufferedImage thermalLogo(BufferedImage source) {
@@ -376,31 +411,35 @@ public final class BodyEvolutionBiometria {
         return defaultPaper.getImageableWidth();
     }
 
-    private static List<String> wrapReceipt(String content, Font font, double width) {
+    private static List<ReceiptLine> wrapReceipt(String content, Font font, Font boldFont, double width) {
         FontRenderContext context = new FontRenderContext(null, true, true);
-        List<String> lines = new ArrayList<>();
+        List<ReceiptLine> lines = new ArrayList<>();
 
         for (String sourceLine : content.split("\\R", -1)) {
-            if (sourceLine.isEmpty()) {
-                lines.add("");
+            boolean bold = sourceLine.contains(BOLD_MARKER);
+            String text = sourceLine.replace(BOLD_MARKER, "");
+            Font lineFont = bold ? boldFont : font;
+
+            if (text.isEmpty()) {
+                lines.add(new ReceiptLine("", bold));
                 continue;
             }
 
             StringBuilder line = new StringBuilder();
-            for (int offset = 0; offset < sourceLine.length();) {
-                int codePoint = sourceLine.codePointAt(offset);
+            for (int offset = 0; offset < text.length();) {
+                int codePoint = text.codePointAt(offset);
                 String character = new String(Character.toChars(codePoint));
                 String candidate = line.toString() + character;
 
-                if (!line.isEmpty() && font.getStringBounds(candidate, context).getWidth() > width) {
-                    lines.add(line.toString());
+                if (!line.isEmpty() && lineFont.getStringBounds(candidate, context).getWidth() > width) {
+                    lines.add(new ReceiptLine(line.toString(), bold));
                     line.setLength(0);
                 }
 
                 line.append(character);
                 offset += Character.charCount(codePoint);
             }
-            lines.add(line.toString());
+            lines.add(new ReceiptLine(line.toString(), bold));
         }
 
         return lines;

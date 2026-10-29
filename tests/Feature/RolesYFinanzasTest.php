@@ -7,6 +7,7 @@ use App\Models\Pago;
 use App\Models\Registros;
 use App\Models\TipoMembresia;
 use App\Models\Usuario;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 test('el usuario puede iniciar sesión por nombre de usuario sin depender del correo', function () {
@@ -60,7 +61,8 @@ test('una recepcionista puede operar clientes y finanzas pero no administrar cue
 
     $this->actingAs($recepcionista)
         ->get('/clientes')
-        ->assertOk();
+        ->assertOk()
+        ->assertDontSee('Egresos');
 
     $this->get('/egresos')->assertOk();
     $this->get('/reportes')->assertOk();
@@ -252,7 +254,7 @@ test('una recepcionista puede registrar egresos y estos quedan auditados', funct
     ]);
 });
 
-test('el reporte separa ingresos de membresías y egresos por categoría y exporta CSV', function () {
+test('el corte diario muestra membresías por método de pago y exporta el CSV del día', function () {
     $recepcionista = Usuario::create([
         'name' => 'Recepción',
         'username' => 'recepcion',
@@ -292,21 +294,371 @@ test('el reporte separa ingresos de membresías y egresos por categoría y expor
     $fecha = today()->toDateString();
     $this->assertDatabaseHas('egresos', ['categoria' => 'Insumos']);
 
-    $this->actingAs($recepcionista)
-        ->get("/reportes?desde={$fecha}&hasta={$fecha}")
-        ->assertOk()
+    $vista = $this->actingAs($recepcionista)
+        ->get("/reportes?fecha={$fecha}")
+        ->assertOk();
+
+    $vista
         ->assertSee('Plan anual')
         ->assertSee('Membresías')
-        ->assertSee('Insumos')
+        ->assertSee('Efectivo')
+        ->assertSee('Aguas')
+        ->assertSee('Salidas')
+        ->assertSee('ID')
+        ->assertSee('Nombre')
+        ->assertSee('Fecha y hora')
+        ->assertSee('Tipo de pago')
+        ->assertSee('Tipo de membresía')
         ->assertSee('$499.00')
-        ->assertSee('$125.00')
-        ->assertSee('$374.00');
+        ->assertDontSee('Insumos');
 
-    $csv = $this->get("/reportes/csv?desde={$fecha}&hasta={$fecha}");
-    $csv->assertOk();
+    $html = $vista->getContent();
+    preg_match_all('/<details\b[^>]*data-metodo="(efectivo|transferencia|tarjeta)"[^>]*>/', $html, $desplegables);
+    expect($desplegables[1])->toBe(['efectivo', 'transferencia', 'tarjeta']);
+    expect($desplegables[0][0])->toContain('open');
+    expect($desplegables[0][1])->not->toContain('open');
+    expect($desplegables[0][2])->not->toContain('open');
 
-    expect($csv->headers->get('content-disposition'))->toContain('reporte-financiero-'.$fecha.'-'.$fecha.'.csv');
+    preg_match('/<tbody class="divide-y divide-white\/5">(.*?)<\/tbody>/s', $html, $filas);
+    expect($filas[1] ?? '')
+        ->toContain('Plan anual')
+        ->not->toContain('Aguas')
+        ->not->toContain('Salidas');
+
+    $excel = $this->get("/reportes/excel?fecha={$fecha}");
+    $excel->assertOk()
+        ->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+
+    expect($excel->headers->get('content-disposition'))
+        ->toContain('reporte-membresias-'.str_replace('-', '', $fecha).'_0000-'.str_replace('-', '', $fecha).'_2359.xlsx');
+
+    $libro = new ZipArchive;
+    expect($libro->open($excel->baseResponse->getFile()->getPathname()))->toBeTrue();
+    $hoja = $libro->getFromName('xl/worksheets/sheet1.xml');
+    $estilos = $libro->getFromName('xl/styles.xml');
+    $libro->close();
+
+    expect($hoja)
+        ->toContain('Plan anual')
+        ->toContain('Luis')
+        ->toContain('Aguas')
+        ->toContain('Salidas');
+    expect($estilos)->toContain('fills');
 });
+
+test('el reporte filtra membresías por fecha y hora e incluye completos los ajustes de cada fecha', function () {
+    $recepcionista = Usuario::create([
+        'name' => 'Recepción',
+        'username' => 'recepcion',
+        'role' => Usuario::ROLE_RECEPCIONISTA,
+        'email' => null,
+        'password' => 'password',
+    ]);
+    $plan = TipoMembresia::create([
+        'nombre' => 'Plan de prueba',
+        'duracion_dias' => 30,
+        'precio' => 100.00,
+        'activo' => true,
+    ]);
+    $fechas = [
+        ['nombre' => 'Antes', 'fecha' => '2026-10-28 14:59:59', 'monto' => 10.00],
+        ['nombre' => 'Inicio', 'fecha' => '2026-10-28 15:00:00', 'monto' => 100.00],
+        ['nombre' => 'Dentro', 'fecha' => '2026-10-29 10:00:59', 'monto' => 50.00],
+        ['nombre' => 'Después', 'fecha' => '2026-10-29 10:01:00', 'monto' => 20.00],
+    ];
+
+    foreach ($fechas as $datosPago) {
+        $cliente = Cliente::create(['nombre' => $datosPago['nombre'], 'apellido' => 'Prueba']);
+        $membresia = Membresia::create([
+            'id_cliente' => $cliente->id,
+            'tipo_membresia_id' => $plan->id,
+            'comienzo' => today(),
+            'finalizacion' => today()->addDays(29),
+            'estado' => Membresia::ESTADO_ACTIVA,
+        ]);
+        $pago = Pago::create([
+            'id_cliente' => $cliente->id,
+            'membresia_id' => $membresia->id,
+            'usuario_id' => $recepcionista->id,
+            'monto' => $datosPago['monto'],
+            'metodo_pago' => 'cash',
+        ]);
+
+        DB::table('pagos')
+            ->where('id', $pago->id)
+            ->update(['created_at' => $datosPago['fecha']]);
+    }
+
+    foreach ([
+        ['fecha' => '2026-10-28', 'concepto' => 'Aguas', 'monto' => '10.00'],
+        ['fecha' => '2026-10-29', 'concepto' => 'Aguas', 'monto' => '20.00'],
+        ['fecha' => '2026-10-29', 'concepto' => 'Salidas', 'monto' => '-3.00'],
+    ] as $indice => $ajuste) {
+        DB::table('reporte_ajustes_manuales')->insert([
+            ...$ajuste,
+            'metodo_pago' => 'efectivo',
+            'orden' => $indice,
+            'usuario_id' => $recepcionista->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    $parametros = [
+        'desde' => '2026-10-28',
+        'hora_desde' => '15:00',
+        'hasta' => '2026-10-29',
+        'hora_hasta' => '10:00',
+    ];
+    $this->actingAs($recepcionista)
+        ->get('/reportes?'.http_build_query($parametros))
+        ->assertOk()
+        ->assertSee('Inicio Prueba')
+        ->assertSee('Dentro Prueba')
+        ->assertDontSee('Antes Prueba')
+        ->assertDontSee('Después Prueba')
+        ->assertSee('30.00')
+        ->assertSee('-3.00')
+        ->assertSee('150.00')
+        ->assertSee('27.00')
+        ->assertSee('177.00')
+        ->assertSee('Los ajustes manuales se incluyen completos')
+        ->assertDontSee('Guardar ajustes');
+
+    $excel = $this->get('/reportes/excel?'.http_build_query($parametros))
+        ->assertOk();
+    expect($excel->headers->get('content-disposition'))
+        ->toContain('reporte-membresias-20261028_1500-20261029_1000.xlsx');
+
+    $libro = new ZipArchive;
+    expect($libro->open($excel->baseResponse->getFile()->getPathname()))->toBeTrue();
+    $hoja = $libro->getFromName('xl/worksheets/sheet1.xml');
+    $libro->close();
+
+    expect($hoja)
+        ->toContain('Inicio')
+        ->toContain('Dentro')
+        ->not->toContain('Antes')
+        ->not->toContain('Despu');
+
+    $this->get('/reportes?desde=2026-10-29&hora_desde=15:00&hasta=2026-10-29&hora_hasta=14:59')
+        ->assertSessionHasErrors([
+            'hasta' => 'El momento final debe ser igual o posterior al momento inicial.',
+        ]);
+});
+
+test('el reporte de membresías filtra la tabla y el Excel por ID de cliente', function () {
+    $recepcionista = Usuario::create([
+        'name' => 'Recepción',
+        'username' => 'recepcion',
+        'role' => Usuario::ROLE_RECEPCIONISTA,
+        'email' => null,
+        'password' => 'password',
+    ]);
+    $plan = TipoMembresia::create([
+        'nombre' => 'Plan individual',
+        'duracion_dias' => 30,
+        'precio' => 100.00,
+        'activo' => true,
+    ]);
+    $clienteFiltrado = Cliente::create(['nombre' => 'Cliente Elegido', 'apellido' => 'Prueba']);
+    $clienteExcluido = Cliente::create(['nombre' => 'Cliente Excluido', 'apellido' => 'Prueba']);
+    $membresiaFiltrada = Membresia::create([
+        'id_cliente' => $clienteFiltrado->id,
+        'tipo_membresia_id' => $plan->id,
+        'comienzo' => today(),
+        'finalizacion' => today()->addDays(29),
+        'estado' => Membresia::ESTADO_ACTIVA,
+    ]);
+    $membresiaExcluida = Membresia::create([
+        'id_cliente' => $clienteExcluido->id,
+        'tipo_membresia_id' => $plan->id,
+        'comienzo' => today(),
+        'finalizacion' => today()->addDays(29),
+        'estado' => Membresia::ESTADO_ACTIVA,
+    ]);
+
+    foreach (range(1, 31) as $numero) {
+        Pago::create([
+            'id_cliente' => $clienteFiltrado->id,
+            'membresia_id' => $membresiaFiltrada->id,
+            'usuario_id' => $recepcionista->id,
+            'monto' => 100.00,
+            'metodo_pago' => 'cash',
+        ]);
+    }
+
+    Pago::create([
+        'id_cliente' => $clienteExcluido->id,
+        'membresia_id' => $membresiaExcluida->id,
+        'usuario_id' => $recepcionista->id,
+        'monto' => 100.00,
+        'metodo_pago' => 'cash',
+    ]);
+
+    $fecha = today()->toDateString();
+    $respuesta = $this->actingAs($recepcionista)
+        ->get('/reportes?'.http_build_query(['fecha' => $fecha, 'cliente_id' => $clienteFiltrado->id]))
+        ->assertOk()
+        ->assertSee('name="cliente_id" value="'.$clienteFiltrado->id.'"', false)
+        ->assertSee('Cliente Elegido Prueba')
+        ->assertDontSee('Cliente Excluido Prueba')
+        ->assertSee('31 pagos')
+        ->assertSee('cliente_id='.$clienteFiltrado->id);
+
+    $excel = $this->get(route('reportes.excel', [
+        'fecha' => $fecha,
+        'cliente_id' => $clienteFiltrado->id,
+    ]))->assertOk();
+    $libro = new ZipArchive;
+
+    expect($libro->open($excel->baseResponse->getFile()->getPathname()))->toBeTrue();
+    $hoja = $libro->getFromName('xl/worksheets/sheet1.xml');
+    $libro->close();
+
+    expect($hoja)
+        ->toContain('Cliente Elegido')
+        ->not->toContain('Cliente Excluido');
+});
+
+test('no permite editar ajustes desde un reporte de varios días', function () {
+    $recepcionista = Usuario::create([
+        'name' => 'Recepción',
+        'username' => 'recepcion',
+        'role' => Usuario::ROLE_RECEPCIONISTA,
+        'email' => null,
+        'password' => 'password',
+    ]);
+
+    $this->actingAs($recepcionista)
+        ->post('/reportes/ajustes', [
+            'fecha' => '2026-10-28',
+            'desde' => '2026-10-28',
+            'hasta' => '2026-10-29',
+            'hora_desde' => '00:00',
+            'hora_hasta' => '23:59',
+            'ajustes' => [
+                'efectivo' => [],
+                'transferencia' => [],
+                'tarjeta' => [],
+            ],
+        ])
+        ->assertSessionHasErrors([
+            'fecha' => 'Los ajustes manuales solo pueden editarse para un solo día.',
+        ]);
+
+    $this->assertDatabaseCount('reporte_ajustes_manuales', 0);
+    $this->assertDatabaseCount('registros', 0);
+});
+
+test('una recepcionista guarda ajustes diarios por método y el total considera importes negativos', function () {
+    $recepcionista = Usuario::create([
+        'name' => 'Recepción',
+        'username' => 'recepcion',
+        'role' => Usuario::ROLE_RECEPCIONISTA,
+        'email' => null,
+        'password' => 'password',
+    ]);
+    $cliente = Cliente::create(['nombre' => 'Luis', 'apellido' => 'Pérez']);
+    $plan = TipoMembresia::create([
+        'nombre' => 'Plan anual',
+        'duracion_dias' => 365,
+        'precio' => 499.00,
+        'activo' => true,
+    ]);
+    $membresia = Membresia::create([
+        'id_cliente' => $cliente->id,
+        'tipo_membresia_id' => $plan->id,
+        'comienzo' => today(),
+        'finalizacion' => today()->addDays(364),
+        'estado' => Membresia::ESTADO_ACTIVA,
+    ]);
+    Pago::create([
+        'id_cliente' => $cliente->id,
+        'membresia_id' => $membresia->id,
+        'usuario_id' => $recepcionista->id,
+        'monto' => 499.00,
+        'metodo_pago' => 'cash',
+    ]);
+    $fecha = today()->toDateString();
+
+    $this->actingAs($recepcionista)
+        ->post('/reportes/ajustes', [
+            'fecha' => $fecha,
+            'ajustes' => [
+                'efectivo' => [
+                    ['concepto' => 'Aguas', 'monto' => '500.00'],
+                    ['concepto' => 'Salidas', 'monto' => '-100.50'],
+                    ['concepto' => 'Venta especial', 'monto' => '10.00'],
+                ],
+                'transferencia' => [
+                    ['concepto' => 'Aguas', 'monto' => '100.00'],
+                    ['concepto' => 'Salidas', 'monto' => '-100.00'],
+                ],
+                'tarjeta' => [
+                    ['concepto' => 'Aguas', 'monto' => null],
+                    ['concepto' => 'Salidas', 'monto' => null],
+                ],
+            ],
+        ])
+        ->assertRedirect("/reportes?fecha={$fecha}");
+
+    $this->assertDatabaseCount('reporte_ajustes_manuales', 5);
+    $this->assertDatabaseHas('reporte_ajustes_manuales', [
+        'fecha' => $fecha,
+        'metodo_pago' => 'efectivo',
+        'concepto' => 'Salidas',
+        'monto' => '-100.50',
+    ]);
+    $this->assertDatabaseHas('registros', [
+        'usuario_id' => $recepcionista->id,
+        'accion' => 'reporte.ajustes.actualizados',
+    ]);
+
+    $vista = $this->get("/reportes?fecha={$fecha}")
+        ->assertOk()
+        ->assertSee('Venta especial')
+        ->assertSee('908.50');
+
+    preg_match('/<tbody class="divide-y divide-white\/5">(.*?)<\/tbody>/s', $vista->getContent(), $filas);
+    expect($filas[1] ?? '')
+        ->toContain('Plan anual')
+        ->not->toContain('Venta especial')
+        ->not->toContain('Aguas')
+        ->not->toContain('Salidas');
+});
+
+test('el reporte rechaza importes manuales inválidos sin guardar cambios', function (string $monto) {
+    $recepcionista = Usuario::create([
+        'name' => 'Recepción',
+        'username' => 'recepcion',
+        'role' => Usuario::ROLE_RECEPCIONISTA,
+        'email' => null,
+        'password' => 'password',
+    ]);
+    $fecha = today()->toDateString();
+
+    $this->actingAs($recepcionista)
+        ->from("/reportes?fecha={$fecha}")
+        ->post('/reportes/ajustes', [
+            'fecha' => $fecha,
+            'ajustes' => [
+                'efectivo' => [
+                    ['concepto' => 'Aguas', 'monto' => $monto],
+                ],
+                'transferencia' => [],
+                'tarjeta' => [],
+            ],
+        ])
+        ->assertRedirect("/reportes?fecha={$fecha}")
+        ->assertSessionHasErrors('ajustes.efectivo.0.monto');
+
+    $this->assertDatabaseCount('reporte_ajustes_manuales', 0);
+    $this->assertDatabaseCount('registros', 0);
+})->with([
+    'texto no numérico' => 'no es un importe',
+    'más de dos decimales' => '10.999',
+]);
 
 test('un administrador puede crear y actualizar planes de membresía y auditar los cambios', function () {
     $administrador = Usuario::create([

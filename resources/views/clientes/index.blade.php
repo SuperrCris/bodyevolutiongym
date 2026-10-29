@@ -36,6 +36,9 @@
         <form method="GET" class="flex flex-col gap-3 sm:flex-row">
             <input name="buscar" value="{{ request('buscar') }}" class="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm outline-none focus:border-teal-300/60" placeholder="Buscar por nombre...">
             <button class="rounded-2xl border border-white/10 px-5 py-3 text-sm font-semibold text-slate-300 transition hover:border-teal-300/50 hover:text-teal-200">Buscar</button>
+            @if (request()->filled('buscar'))
+                <a href="{{ route('clientes.index') }}" class="inline-flex items-center justify-center rounded-2xl border border-white/10 px-5 py-3 text-sm font-semibold text-slate-300 transition hover:border-amber-300/40 hover:text-amber-200">Limpiar búsqueda</a>
+            @endif
         </form>
     </div>
 
@@ -99,30 +102,33 @@
     <div>{{ $clientes->links() }}</div>
 </div>
 
-<div id="crearCliente" data-modal class="modal-backdrop z-50 hidden bg-slate-950/80">
-    <div class="modal-panel w-full max-w-lg">
-        <div class="flex items-center justify-between"><h2 class="text-xl font-bold">Nuevo cliente</h2><button type="button" data-close-modal class="text-2xl text-slate-500 hover:text-white">×</button></div>
-        @include('clientes.partials.formulario', ['action' => route('clientes.store'), 'method' => 'POST', 'cliente' => null])
-    </div>
-</div>
+@if ($clienteParaRenovar && ! $clientes->getCollection()->contains('id', $clienteParaRenovar->id))
+    @include('clientes.partials.renovar', ['cliente' => $clienteParaRenovar, 'planes' => $planes])
+@endif
 
-<div
-    id="enrolarHuellaCompartido"
-    data-modal
-    data-enrolamiento-inicial="{{ $clienteParaEnrolar?->id ?? '' }}"
-    data-enrolamiento-nombre="{{ $clienteParaEnrolar ? $clienteParaEnrolar->nombre.' '.$clienteParaEnrolar->apellido : '' }}"
-    data-enrolamiento-tiene-huella="{{ $clienteParaEnrolar && $clienteParaEnrolar->credencialesBiometricas->isNotEmpty() ? 'true' : 'false' }}"
-    class="modal-backdrop z-[55] {{ $clienteParaEnrolar ? 'flex' : 'hidden' }} bg-slate-950/80"
->
-    <div class="modal-panel w-full max-w-lg">
-        <div class="flex items-center justify-between gap-4">
-            <div>
-                <h2 data-titulo-enrolamiento class="text-xl font-bold">Registrar huella</h2>
-                <p data-nombre-cliente-enrolamiento class="mt-1 text-sm text-slate-400">Cliente: {{ $clienteParaEnrolar ? $clienteParaEnrolar->nombre.' '.$clienteParaEnrolar->apellido : '' }}</p>
+<div id="crearCliente" data-modal class="modal-backdrop z-50 {{ $clienteParaEnrolar ? 'flex' : 'hidden' }} bg-slate-950/80" @if ($clienteParaEnrolar) data-refresh-after-close @endif>
+    <div class="modal-panel max-h-[calc(100vh-3rem)] w-full max-w-lg overflow-y-auto">
+        @if ($clienteParaEnrolar)
+            <div class="flex items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-xl font-bold">Registrar huella</h2>
+                    <p class="mt-1 text-sm text-slate-400">Cliente: {{ $clienteParaEnrolar->nombre }} {{ $clienteParaEnrolar->apellido }}</p>
+                </div>
+                <button type="button" data-close-modal class="text-2xl text-slate-500 hover:text-white" aria-label="Cerrar">×</button>
             </div>
-            <button type="button" data-close-modal class="text-2xl text-slate-500 hover:text-white" aria-label="Cerrar">×</button>
-        </div>
-        @include('clientes.partials.enrolar-huella', ['clienteId' => '', 'tieneHuella' => false])
+            @include('clientes.partials.enrolar-huella', [
+                'clienteId' => $clienteParaEnrolar->id,
+                'tieneHuella' => $clienteParaEnrolar->credencialesBiometricas->isNotEmpty(),
+                'requiereGuardar' => false,
+            ])
+            <div class="mt-5 grid gap-3 sm:grid-cols-2">
+                <button type="button" data-open-membership-modal="{{ $clienteParaEnrolar->id }}" class="button-primary w-full px-4 py-3">Comprar membresía</button>
+                <button type="button" data-close-modal class="w-full rounded-xl border border-white/10 px-4 py-3 text-sm font-semibold text-slate-300 transition hover:border-white/30">Salir</button>
+            </div>
+        @else
+            <div class="flex items-center justify-between"><h2 class="text-xl font-bold">Nuevo cliente</h2><button type="button" data-close-modal class="text-2xl text-slate-500 hover:text-white">×</button></div>
+            @include('clientes.partials.formulario', ['action' => route('clientes.store'), 'method' => 'POST', 'cliente' => null])
+        @endif
     </div>
 </div>
 
@@ -152,42 +158,46 @@
         const modal = document.getElementById(button.dataset.openModal);
         modal.classList.remove('hidden'); modal.classList.add('flex');
     }));
-    document.querySelectorAll('[data-close-modal]').forEach((button) => button.addEventListener('click', () => {
-        const modal = button.closest('[data-modal]'); modal.classList.add('hidden'); modal.classList.remove('flex');
-    }));
-    function abrirModalEnrolamiento(clienteId, nombre, tieneHuella) {
-        const modal = document.getElementById('enrolarHuellaCompartido');
-        const panel = modal.querySelector('[data-progreso-enrolamiento]');
-        const button = panel.querySelector('[data-enrolar-huella]');
-        const label = tieneHuella ? 'Actualizar huella' : 'Registrar huella';
+    const clienteIdParaRenovar = new URLSearchParams(window.location.search).get('abrir_renovacion');
+    if (/^\d+$/.test(clienteIdParaRenovar ?? '')) {
+        const modalRenovacion = document.getElementById(`renovar-${clienteIdParaRenovar}`);
+        if (modalRenovacion) {
+            modalRenovacion.classList.remove('hidden');
+            modalRenovacion.classList.add('flex');
+            modalRenovacion.querySelector('select[name="tipo_membresia_id"]')?.focus();
 
-        panel.dataset.progresoEnrolamiento = clienteId;
-        button.dataset.enrolarHuella = clienteId;
-        button.dataset.labelInicial = label;
-        button.disabled = false;
-        button.textContent = label;
-        modal.querySelector('[data-titulo-enrolamiento]').textContent = label;
-        modal.querySelector('[data-nombre-cliente-enrolamiento]').textContent = `Cliente: ${nombre}`;
-        panel.querySelectorAll('[data-paso-enrolamiento]').forEach((circulo) => {
-            circulo.dataset.completed = 'false';
-        });
-        panel.querySelector('[data-mensaje-enrolamiento]').textContent = 'Coloca y levanta el mismo dedo 4 veces.';
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
+            const urlActual = new URL(window.location.href);
+            urlActual.searchParams.delete('abrir_renovacion');
+            window.history.replaceState({}, '', urlActual);
+        }
     }
-    document.querySelectorAll('[data-open-enrollment]').forEach((button) => button.addEventListener('click', () => {
-        abrirModalEnrolamiento(
-            button.dataset.openEnrollment,
-            button.dataset.clienteNombre,
-            button.dataset.tieneHuella === 'true',
-        );
+    document.querySelectorAll('[data-open-membership-modal]').forEach((button) => button.addEventListener('click', () => {
+        const enrollmentModal = button.closest('[data-modal]');
+        const membershipModal = document.getElementById(`renovar-${button.dataset.openMembershipModal}`);
+
+        enrollmentModal.classList.add('hidden');
+        enrollmentModal.classList.remove('flex');
+        membershipModal.classList.remove('hidden');
+        membershipModal.classList.add('flex');
+    }));
+    document.querySelectorAll('[data-close-modal]').forEach((button) => button.addEventListener('click', () => {
+        const modal = button.closest('[data-modal]');
+        const refreshAfterClose = modal.hasAttribute('data-refresh-after-close');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+
+        if (refreshAfterClose) {
+            window.location.reload();
+        }
     }));
     document.querySelectorAll('[data-foto-input]').forEach((input) => input.addEventListener('change', () => {
         const preview = input.closest('form').querySelector('[data-foto-preview]');
+        const placeholder = input.closest('form').querySelector('[data-foto-placeholder]');
         const file = input.files?.[0];
         if (!file) return;
         preview.src = URL.createObjectURL(file);
         preview.classList.remove('hidden');
+        placeholder.classList.add('hidden');
     }));
     const cameraModal = document.querySelector('[data-camera-modal]');
     const cameraVideo = cameraModal?.querySelector('[data-camera-video]');
@@ -327,7 +337,10 @@
             actualizarProgresoEnrolamiento(clienteId, 4, 4);
             mostrarMensajeEnrolamiento(clienteId, 'Huella registrada correctamente.');
             enrollmentButtons.forEach((action) => {
-                action.textContent = 'Huella registrada';
+                action.disabled = false;
+                action.dataset.labelInicial = 'Actualizar huella';
+                action.textContent = 'Actualizar huella';
+                action.classList.remove('text-indigo-200');
                 action.classList.add('text-teal-200');
             });
             document.querySelectorAll(`[data-huella-estado="${clienteId}"]`).forEach((estado) => {
@@ -369,14 +382,6 @@
             button.textContent = 'Verificar huella';
         }
     });
-    const modalEnrolamiento = document.getElementById('enrolarHuellaCompartido');
-    if (modalEnrolamiento.dataset.enrolamientoInicial) {
-        abrirModalEnrolamiento(
-            modalEnrolamiento.dataset.enrolamientoInicial,
-            modalEnrolamiento.dataset.enrolamientoNombre,
-            modalEnrolamiento.dataset.enrolamientoTieneHuella === 'true',
-        );
-    }
     actualizarResumen();
     setInterval(actualizarResumen, 15000);
 </script>

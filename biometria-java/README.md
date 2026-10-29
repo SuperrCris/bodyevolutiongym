@@ -19,7 +19,9 @@ El lector debe estar conectado y sus controladores DigitalPersona instalados. La
 
 ## Impresión de recibos
 
-El endpoint local `POST /imprimir` envía un único trabajo a la impresora predeterminada de Windows. Cada trabajo contiene dos copias completas del recibo, en páginas consecutivas; no crea un segundo pago ni requiere una segunda solicitud.
+El endpoint local `POST /imprimir` envía un único trabajo a la impresora predeterminada de Windows con una o dos copias completas del recibo, en páginas consecutivas; no crea un segundo pago ni requiere una segunda solicitud. El protocolo actual (`BEG-PRINT-V2`) indica la cantidad de copias; las solicitudes anteriores `BEG-PRINT-V1` siguen imprimiendo dos.
+
+Para imprimir una línea en negritas, agrega `?n` en cualquier parte de esa línea del contenido del recibo. El puente elimina el marcador y aplica negritas a toda la línea.
 
 Comprueba el estado del puente y la impresora predeterminada desde PowerShell:
 
@@ -28,4 +30,4 @@ Invoke-RestMethod http://127.0.0.1:8765/salud
 Invoke-RestMethod http://127.0.0.1:8765/impresora
 ```
 
-La respuesta de impresión confirma `copies: 2` cuando el puente acepta ambas páginas del trabajo. La salida física debe validarse con la ticketera conectada.
+La respuesta de impresión confirma la cantidad solicitada en `copies`. La salida física debe validarse con la ticketera conectada.

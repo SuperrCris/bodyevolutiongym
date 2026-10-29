@@ -36,7 +36,7 @@ class ClientesController extends Controller
             })
             ->latest()
             ->paginate(12)
-            ->withQueryString();
+            ->appends($request->except('abrir_renovacion'));
 
         $clienteParaEnrolar = null;
         $clienteIdParaEnrolar = $request->session()->pull('cliente_para_enrolar');
@@ -47,9 +47,17 @@ class ClientesController extends Controller
                 ->findOrFail($clienteIdParaEnrolar);
         }
 
+        $datosRenovacion = $request->validate([
+            'abrir_renovacion' => ['sometimes', 'integer', 'min:1'],
+        ]);
+        $clienteParaRenovar = isset($datosRenovacion['abrir_renovacion'])
+            ? Cliente::query()->findOrFail((int) $datosRenovacion['abrir_renovacion'])
+            : null;
+
         return view('clientes.index', [
             'clientes' => $clientes,
             'clienteParaEnrolar' => $clienteParaEnrolar,
+            'clienteParaRenovar' => $clienteParaRenovar,
             'planes' => TipoMembresia::query()->where('activo', true)->orderBy('duracion_dias')->get(),
         ]);
     }
@@ -114,14 +122,14 @@ class ClientesController extends Controller
             ],
             'metodo_pago' => ['required', 'string', 'in:efectivo,tarjeta,transferencia'],
             'referencia' => ['nullable', 'string', 'max:100', 'unique:pagos,referencia'],
-            'imprimir' => ['sometimes', 'in:true,1'],
+            'imprimir' => ['sometimes', 'in:true,1,dos,uno,no'],
         ]);
 
-        $metodos = [
-            'efectivo',
-            'tarjeta',
-            'transferencia',
-        ];
+        $copiasRecibo = match ($data['imprimir'] ?? 'no') {
+            'true', '1', 'dos' => 2,
+            'uno' => 1,
+            default => 0,
+        };
 
         $membresia = $servicio->renovar(
             $cliente,
@@ -131,10 +139,10 @@ class ClientesController extends Controller
             $data['referencia'] ?? null,
         );
 
-        if ($request->boolean('imprimir')) {
+        if ($copiasRecibo > 0) {
             $pago = $membresia->pagos()->firstOrFail();
 
-            return $this->enviarRecibo($pago, $ticketera);
+            return $this->enviarRecibo($pago, $ticketera, $copiasRecibo);
         }
 
         return to_route('clientes.index')->with('success', 'Membresía renovada correctamente.');
@@ -214,16 +222,18 @@ class ClientesController extends Controller
         ]);
     }
 
-    private function enviarRecibo(Pago $pago, TicketeraServicio $ticketera): RedirectResponse
+    private function enviarRecibo(Pago $pago, TicketeraServicio $ticketera, int $copias = 2): RedirectResponse
     {
         try {
-            $impresora = $ticketera->imprimir($pago);
+            $impresora = $ticketera->imprimir($pago, $copias);
         } catch (TicketeraException $exception) {
             return to_route('pagos.recibo', $pago)->with('error', $exception->getMessage());
         }
 
+        $confirmacion = $copias === 1 ? 'Un ticket enviado' : 'Dos tickets enviados';
+
         return to_route('clientes.index')
-            ->with('success', "Recibo enviado a la impresora predeterminada: {$impresora}.");
+            ->with('success', "{$confirmacion} a la impresora predeterminada: {$impresora}.");
     }
 
     public function resumen(): JsonResponse
@@ -254,15 +264,14 @@ class ClientesController extends Controller
                 'nullable',
                 'email',
                 'max:255',
-                Rule::unique('clientes', 'email')->ignore($cliente?->id),
             ],
             'telefono' => ['nullable', 'string', 'max:30'],
             'documento' => [
                 'nullable',
                 'string',
                 'max:50',
-                Rule::unique('clientes', 'documento')->ignore($cliente?->id),
             ],
+            'direccion' => ['nullable', 'string', 'max:255'],
             'fecha_nacimiento' => ['nullable', 'date'],
             'foto' => [
                 'nullable',

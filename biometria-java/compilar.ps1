@@ -21,4 +21,8 @@ New-Item -ItemType Directory -Force -Path $build | Out-Null
     -d $build `
     (Join-Path $PSScriptRoot 'src\BodyEvolutionBiometria.java')
 
+if ($LASTEXITCODE -ne 0) {
+    throw "La compilación del puente Java falló con el código de salida $LASTEXITCODE."
+}
+
 Write-Host "Puente compilado en $build"

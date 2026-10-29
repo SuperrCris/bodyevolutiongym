@@ -1,9 +1,9 @@
-<div data-progreso-enrolamiento="{{ $clienteId ?? '' }}" class="mt-5 border-t border-white/10 pt-5">
+<div data-progreso-enrolamiento="{{ $clienteId ?? '' }}" class="border-t border-white/10 pt-5">
     <div class="flex items-center justify-between gap-4">
         <div class="min-w-0">
             <h3 class="text-sm font-bold text-slate-200">Enrolamiento de huella</h3>
             <p data-mensaje-enrolamiento class="mt-1 text-xs text-slate-400" role="status" aria-live="polite">
-                Coloca y levanta el mismo dedo 4 veces.
+                {{ ($requiereGuardar ?? false) ? 'Se guardará el cliente antes de iniciar la captura.' : (($tieneHuella ?? false) ? 'Hay una huella registrada. Captura de nuevo para reemplazarla.' : 'Coloca y levanta el mismo dedo 4 veces.') }}
             </p>
         </div>
         <div class="flex shrink-0 items-center gap-2" role="group" aria-label="Progreso del enrolamiento">
@@ -13,9 +13,13 @@
         </div>
     </div>
     <button
-        type="button"
-        data-enrolar-huella="{{ $clienteId ?? '' }}"
+        type="{{ ($requiereGuardar ?? false) ? 'submit' : 'button' }}"
+        @if ($requiereGuardar ?? false)
+            name="registrar_huella_despues" value="1"
+        @else
+            data-enrolar-huella="{{ $clienteId ?? '' }}"
+        @endif
         data-label-inicial="{{ ($tieneHuella ?? false) ? 'Actualizar huella' : 'Registrar huella' }}"
         class="mt-4 w-full rounded-xl border border-indigo-300/40 px-4 py-3 text-sm font-bold text-indigo-200 transition hover:border-indigo-200 hover:bg-indigo-300/10"
-    >{{ ($tieneHuella ?? false) ? 'Actualizar huella' : 'Registrar huella' }}</button>
+    >{{ ($requiereGuardar ?? false) ? 'Registrar huella' : (($tieneHuella ?? false) ? 'Actualizar huella' : 'Registrar huella') }}</button>
 </div>

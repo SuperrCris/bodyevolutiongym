@@ -78,7 +78,7 @@
 
         <section class="panel overflow-hidden shadow-xl">
             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-4 sm:px-7">
-                <h2 class="text-lg font-bold text-white">Planes disponibles y pausados</h2>
+                <h2 class="text-lg font-bold text-white">Membresias</h2>
                 <span class="text-sm text-slate-400">{{ $tiposMembresia->where('activo', true)->count() }} disponibles</span>
             </div>
             <div class="divide-y divide-white/5">
@@ -88,7 +88,7 @@
                             <span>
                                 <span class="block font-semibold text-white">{{ $tipoMembresia->nombre }}</span>
                                 <span class="text-sm text-slate-400">
-                                    {{ $tipoMembresia->duracion_dias }} días · ${{ number_format((float) $tipoMembresia->precio, 2) }}
+                                    {{ $tipoMembresia->duracion_dias }} {{ $tipoMembresia->duracion_dias > 1 ? 'días' : 'dia' }} · ${{ number_format((float) $tipoMembresia->precio, 2) }}
                                 </span>
                             </span>
                             <span class="flex items-center gap-3">

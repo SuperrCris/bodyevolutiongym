@@ -37,6 +37,165 @@ test('un operador puede iniciar sesión y crear un cliente', function () {
     expect(Cliente::query()->where('documento', 'DOC-001')->exists())->toBeTrue();
 });
 
+test('un operador puede crear un cliente sin correo ni documento y guardar su dirección', function () {
+    $usuario = Usuario::create([
+        'name' => 'Operador',
+        'email' => 'operador.direccion@example.com',
+        'password' => 'password',
+    ]);
+
+    $this->actingAs($usuario)
+        ->post('/clientes', [
+            'nombre' => 'Lucía',
+            'apellido' => 'Pérez',
+            'direccion' => 'Av. Central 123',
+        ])
+        ->assertRedirect('/clientes');
+
+    $this->assertDatabaseHas('clientes', [
+        'nombre' => 'Lucía',
+        'apellido' => 'Pérez',
+        'email' => null,
+        'documento' => null,
+        'direccion' => 'Av. Central 123',
+    ]);
+
+    $response = $this->get('/clientes')->assertOk();
+
+    expect(substr_count($response->getContent(), 'name="documento"'))->toBe(2);
+    expect(substr_count($response->getContent(), 'name="direccion"'))->toBe(2);
+});
+
+test('el formulario de nuevo cliente muestra guardar y asignar huella sin mostrar progreso de enrolamiento', function () {
+    $usuario = Usuario::create([
+        'name' => 'Operador',
+        'email' => 'operador.nuevo.huella@example.com',
+        'password' => 'password',
+    ]);
+
+    $this->actingAs($usuario)
+        ->get('/clientes')
+        ->assertOk()
+        ->assertSee('Guardar cliente')
+        ->assertSee('Guardar y asignar huella')
+        ->assertDontSee('Enrolamiento de huella')
+        ->assertDontSee('data-progreso-enrolamiento=""', false);
+});
+
+test('la API permite crear un cliente sin correo ni documento con dirección', function () {
+    $usuario = Usuario::create([
+        'name' => 'Operador',
+        'email' => 'operador.api.direccion@example.com',
+        'password' => 'password',
+    ]);
+
+    $this->actingAs($usuario)
+        ->postJson('/api/v1/clientes', [
+            'nombre' => 'Mario',
+            'apellido' => 'López',
+            'direccion' => 'Calle Norte 45',
+        ])
+        ->assertStatus(201)
+        ->assertJsonPath('email', null)
+        ->assertJsonPath('documento', null)
+        ->assertJsonPath('direccion', 'Calle Norte 45');
+
+    $this->assertDatabaseHas('clientes', [
+        'nombre' => 'Mario',
+        'apellido' => 'López',
+        'email' => null,
+        'documento' => null,
+        'direccion' => 'Calle Norte 45',
+    ]);
+});
+
+test('un operador puede registrar clientes con correo y documento repetidos', function () {
+    $usuario = Usuario::create([
+        'name' => 'Operador',
+        'email' => 'operador.duplicados@example.com',
+        'password' => 'password',
+    ]);
+    Cliente::create([
+        'nombre' => 'Ana',
+        'apellido' => 'García',
+        'email' => 'compartido@example.com',
+        'documento' => 'DOC-REPETIDO',
+    ]);
+
+    $this->actingAs($usuario)
+        ->post('/clientes', [
+            'nombre' => 'Luis',
+            'apellido' => 'Pérez',
+            'email' => 'compartido@example.com',
+            'documento' => 'DOC-REPETIDO',
+        ])
+        ->assertRedirect('/clientes');
+
+    $this->assertDatabaseCount('clientes', 2);
+});
+
+test('un operador puede actualizar un cliente con correo y documento de otro cliente', function () {
+    $usuario = Usuario::create([
+        'name' => 'Operador',
+        'email' => 'operador.editar.duplicados@example.com',
+        'password' => 'password',
+    ]);
+    $cliente = Cliente::create([
+        'nombre' => 'Ana',
+        'apellido' => 'García',
+        'email' => 'ana@example.com',
+        'documento' => 'DOC-ANA',
+    ]);
+    Cliente::create([
+        'nombre' => 'Luis',
+        'apellido' => 'Pérez',
+        'email' => 'compartido@example.com',
+        'documento' => 'DOC-REPETIDO',
+    ]);
+
+    $this->actingAs($usuario)
+        ->put(route('clientes.update', $cliente), [
+            'nombre' => 'Ana',
+            'apellido' => 'García',
+            'email' => 'compartido@example.com',
+            'documento' => 'DOC-REPETIDO',
+        ])
+        ->assertRedirect('/clientes');
+
+    $this->assertDatabaseHas('clientes', [
+        'id' => $cliente->id,
+        'email' => 'compartido@example.com',
+        'documento' => 'DOC-REPETIDO',
+    ]);
+});
+
+test('la API permite registrar clientes con correo y documento repetidos', function () {
+    $usuario = Usuario::create([
+        'name' => 'Operador',
+        'email' => 'operador.api.duplicados@example.com',
+        'password' => 'password',
+    ]);
+    Cliente::create([
+        'nombre' => 'Ana',
+        'apellido' => 'García',
+        'email' => 'compartido@example.com',
+        'documento' => 'DOC-REPETIDO',
+    ]);
+
+    $this->actingAs($usuario)
+        ->postJson('/api/v1/clientes', [
+            'nombre' => 'Luis',
+            'apellido' => 'Pérez',
+            'email' => 'compartido@example.com',
+            'documento' => 'DOC-REPETIDO',
+        ])
+        ->assertStatus(201)
+        ->assertJsonPath('email', 'compartido@example.com')
+        ->assertJsonPath('documento', 'DOC-REPETIDO');
+
+    $this->assertDatabaseCount('clientes', 2);
+});
+
 test('un operador puede guardar un cliente y continuar con el registro de su huella', function () {
     $usuario = Usuario::create([
         'name' => 'Operador',
@@ -57,7 +216,7 @@ test('un operador puede guardar un cliente y continuar con el registro de su hue
     $this->assertModelExists($cliente);
 });
 
-test('muestra el modal de enrolamiento una sola vez para el cliente recién creado', function () {
+test('muestra el enrolamiento dentro del modal de alta para el cliente recién creado', function () {
     $usuario = Usuario::create([
         'name' => 'Operador',
         'email' => 'operador.modal.huella@example.com',
@@ -73,16 +232,22 @@ test('muestra el modal de enrolamiento una sola vez para el cliente recién crea
     $response
         ->assertSee('Cliente: Ana García')
         ->assertSee('data-paso-enrolamiento="4"', false)
-        ->assertSee('data-mensaje-enrolamiento', false);
-    expect(substr_count($response->getContent(), '<div data-progreso-enrolamiento='))
-        ->toBe(1);
+        ->assertSee('data-mensaje-enrolamiento', false)
+        ->assertSee('id="crearCliente" data-modal class="modal-backdrop z-50 flex bg-slate-950/80"', false)
+        ->assertSee('data-refresh-after-close', false)
+        ->assertSee('data-enrolar-huella="'.$cliente->id.'"', false)
+        ->assertSee('data-open-membership-modal="'.$cliente->id.'"', false)
+        ->assertSee('Comprar membresía')
+        ->assertSee('>Salir</button>', false)
+        ->assertSee('id="renovar-'.$cliente->id.'" data-modal', false)
+        ->assertDontSee('id="enrolarHuellaCompartido"', false);
 
     $this->get('/clientes')
         ->assertOk()
         ->assertDontSee('Cliente: Ana García');
 });
 
-test('ofrece el enrolamiento desde editar y mantiene una sola interfaz compartida', function () {
+test('muestra la captura de huella dentro del formulario de edición del cliente', function () {
     $usuario = Usuario::create([
         'name' => 'Operador',
         'email' => 'operador.editar.huella@example.com',
@@ -93,11 +258,34 @@ test('ofrece el enrolamiento desde editar y mantiene una sola interfaz compartid
     $response = $this->actingAs($usuario)->get('/clientes');
 
     $response->assertOk()
-        ->assertSee('data-open-enrollment="'.$cliente->id.'"', false)
+        ->assertSee('data-progreso-enrolamiento="'.$cliente->id.'"', false)
+        ->assertSee('data-mensaje-enrolamiento', false)
+        ->assertSee('data-enrolar-huella="'.$cliente->id.'"', false)
         ->assertSee('data-open-modal="renovar-'.$cliente->id.'"', false)
-        ->assertDontSee('data-enrolar-huella="'.$cliente->id.'"', false);
+        ->assertDontSee('id="enrolarHuellaCompartido"', false);
     expect(substr_count($response->getContent(), '<div data-progreso-enrolamiento='))
         ->toBe(1);
+});
+
+test('muestra la opción de actualizar la huella existente en la edición del cliente', function () {
+    $usuario = Usuario::create([
+        'name' => 'Operador',
+        'email' => 'operador.actualizar.huella@example.com',
+        'password' => 'password',
+    ]);
+    $cliente = Cliente::create(['nombre' => 'Ana', 'apellido' => 'García']);
+    $cliente->credencialesBiometricas()->create([
+        'proveedor' => 'digitalpersona',
+        'id_externo' => 'credencial-edicion',
+        'plantilla' => 'plantilla-anterior',
+        'estado' => true,
+    ]);
+
+    $this->actingAs($usuario)
+        ->get('/clientes')
+        ->assertOk()
+        ->assertSee('data-label-inicial="Actualizar huella"', false)
+        ->assertSee('Hay una huella registrada. Captura de nuevo para reemplazarla.');
 });
 
 test('un operador puede buscar un cliente por su ID', function () {
@@ -112,8 +300,8 @@ test('un operador puede buscar un cliente por su ID', function () {
     $this->actingAs($usuario)
         ->get(route('clientes.index', ['buscar' => $clienteBuscado->id]))
         ->assertOk()
-        ->assertSee('data-open-enrollment="'.$clienteBuscado->id.'"', false)
-        ->assertDontSee('data-open-enrollment="'.$clienteNoCoincidente->id.'"', false);
+        ->assertSee('data-enrolar-huella="'.$clienteBuscado->id.'"', false)
+        ->assertDontSee('data-enrolar-huella="'.$clienteNoCoincidente->id.'"', false);
 });
 
 test('un operador conserva la búsqueda textual de clientes', function () {
@@ -128,11 +316,54 @@ test('un operador conserva la búsqueda textual de clientes', function () {
     $this->actingAs($usuario)
         ->get(route('clientes.index', ['buscar' => 'Ana']))
         ->assertOk()
-        ->assertSee('data-open-enrollment="'.$clienteCoincidente->id.'"', false)
-        ->assertDontSee('data-open-enrollment="'.$clienteNoCoincidente->id.'"', false);
+        ->assertSee('data-enrolar-huella="'.$clienteCoincidente->id.'"', false)
+        ->assertDontSee('data-enrolar-huella="'.$clienteNoCoincidente->id.'"', false)
+        ->assertSee('Limpiar búsqueda')
+        ->assertSee('href="'.route('clientes.index').'"', false);
 });
 
-test('un operador puede renovar la membresía de un cliente', function () {
+test('un operador puede abrir renovación sin filtrar la lista de clientes', function () {
+    $usuario = Usuario::create([
+        'name' => 'Operador',
+        'email' => 'operador.renovacion.directa@example.com',
+        'password' => 'password',
+    ]);
+    $clienteParaRenovar = Cliente::create([
+        'nombre' => 'Cliente',
+        'apellido' => 'Para renovar',
+    ]);
+    $clienteParaRenovar->created_at = now()->subMinutes(13);
+    $clienteParaRenovar->save();
+
+    for ($indice = 1; $indice <= 12; $indice++) {
+        $clienteVisible = Cliente::create([
+            'nombre' => 'Cliente visible',
+            'apellido' => (string) $indice,
+        ]);
+        $clienteVisible->created_at = now()->addSeconds($indice);
+        $clienteVisible->save();
+    }
+
+    $response = $this->actingAs($usuario)
+        ->get(route('clientes.index', ['abrir_renovacion' => $clienteParaRenovar->id]));
+
+    $response->assertOk()
+        ->assertSee('id="renovar-'.$clienteParaRenovar->id.'"', false)
+        ->assertSee('Cliente visible')
+        ->assertDontSee('#'.$clienteParaRenovar->id.' - Cliente Para renovar')
+        ->assertDontSee('name="buscar" value="'.$clienteParaRenovar->id.'"', false);
+});
+
+test('un operador puede renovar una membresía sin imprimir el ticket', function () {
+    Http::preventStrayRequests();
+    Http::fake([
+        'http://127.0.0.1:8765/imprimir' => Http::response([
+            'printed' => true,
+            'printer' => 'EC-PM-80250LI',
+            'copies' => 2,
+        ]),
+    ]);
+
     $usuario = Usuario::create([
         'name' => 'Operador',
         'email' => 'operador@example.com',
@@ -154,11 +385,34 @@ test('un operador puede renovar la membresía de un cliente', function () {
         ->post("/clientes/{$cliente->id}/renovar", [
             'tipo_membresia_id' => $plan->id,
             'metodo_pago' => 'efectivo',
+            'imprimir' => 'no',
         ])
-        ->assertRedirect('/clientes');
+        ->assertRedirect('/clientes')
+        ->assertSessionHas('success', 'Membresía renovada correctamente.');
 
     expect($cliente->membresias()->where('estado', 'activa')->exists())->toBeTrue();
     expect($cliente->pagos()->where('monto', 350)->exists())->toBeTrue();
+    Http::assertSentCount(0);
+});
+
+test('muestra las tres opciones de impresión al renovar una membresía', function () {
+    $usuario = Usuario::create([
+        'name' => 'Operador',
+        'email' => 'operador.opciones.impresion@example.com',
+        'password' => 'password',
+    ]);
+    $cliente = Cliente::create(['nombre' => 'Ana', 'apellido' => 'García']);
+
+    $this->actingAs($usuario)
+        ->get('/clientes')
+        ->assertOk()
+        ->assertSee('Impresión del recibo')
+        ->assertSee('name="imprimir" value="dos" checked', false)
+        ->assertSee('name="imprimir" value="uno"', false)
+        ->assertSee('name="imprimir" value="no"', false)
+        ->assertSee('Imprimir tickets')
+        ->assertSee('Imprimir un solo ticket')
+        ->assertSee('No imprimir ticket');
 });
 
 test('un administrador puede cambiar la vigencia de una membresía y auditar los valores', function () {
@@ -307,7 +561,7 @@ test('rechaza una vigencia anterior al día actual y no registra el cambio', fun
     ]);
 });
 
-test('un operador puede imprimir el recibo de una renovación solicitada', function () {
+test('un operador puede imprimir dos tickets para una renovación solicitada', function () {
     Http::preventStrayRequests();
     Http::fake([
         'http://127.0.0.1:8765/imprimir' => Http::response([
@@ -338,7 +592,7 @@ test('un operador puede imprimir el recibo de una renovación solicitada', funct
         ->post("/clientes/{$cliente->id}/renovar", [
             'tipo_membresia_id' => $plan->id,
             'metodo_pago' => 'efectivo',
-            'imprimir' => 'true',
+            'imprimir' => 'dos',
         ]);
     $pago = Pago::query()->firstOrFail();
 
@@ -352,11 +606,13 @@ test('un operador puede imprimir el recibo de una renovación solicitada', funct
     $request = Http::recorded()->first()[0];
     $body = $request->body();
 
-    expect($body)->toStartWith("BEG-PRINT-V1\n")
+    expect($body)->toStartWith("BEG-PRINT-V2\n2\n")
         ->toContain(base64_encode(file_get_contents(public_path('images/logo.png'))))
         ->toContain('Folio: #'.$pago->id)
-        ->toContain('Luis <script>alert(\'x\')</script> Pérez')
-        ->toContain('Método: efectivo')
+        ->toContain('Cliente: #'.$cliente->id." •  Luis <script>alert('x')</script> Pérez")
+        ->toContain('Membresia plan de prueba')
+        ->toContain('TOTAL: $350.00')
+        ->toContain('efectivo')
         ->toContain('TOTAL: $350.00');
 
     $this->actingAs($usuario)
@@ -372,6 +628,45 @@ test('un operador puede imprimir el recibo de una renovación solicitada', funct
         ->assertSee('images/logo.png')
         ->assertSee(route('pagos.imprimir', $pago), false)
         ->assertDontSee('window.print()', false);
+});
+
+test('un operador puede imprimir un solo ticket para una renovación solicitada', function () {
+    Http::preventStrayRequests();
+    Http::fake([
+        'http://127.0.0.1:8765/imprimir' => Http::response([
+            'printed' => true,
+            'printer' => 'EC-PM-80250LI',
+            'copies' => 1,
+        ]),
+    ]);
+
+    $usuario = Usuario::create([
+        'name' => 'Operador',
+        'email' => 'operador.recibo.uno@example.com',
+        'password' => 'password',
+    ]);
+    $cliente = Cliente::create(['nombre' => 'Ana', 'apellido' => 'López']);
+    $plan = TipoMembresia::create([
+        'nombre' => 'Plan de prueba',
+        'duracion_dias' => 30,
+        'precio' => 350,
+        'activo' => true,
+    ]);
+
+    $response = $this->actingAs($usuario)
+        ->post("/clientes/{$cliente->id}/renovar", [
+            'tipo_membresia_id' => $plan->id,
+            'metodo_pago' => 'efectivo',
+            'imprimir' => 'uno',
+        ]);
+    $pago = Pago::query()->firstOrFail();
+
+    $response->assertRedirect('/clientes')
+        ->assertSessionHas('success', fn (string $message) => str_contains($message, 'Un ticket enviado'));
+    $this->assertModelExists($pago);
+    $this->assertDatabaseCount('pagos', 1);
+    Http::assertSentCount(1);
+    expect(Http::recorded()->first()[0]->body())->toStartWith("BEG-PRINT-V2\n1\n");
 });
 
 test('no confirma la impresión si el puente no confirma las dos copias en un solo trabajo', function () {
@@ -530,7 +825,10 @@ test('un operador puede guardar la foto de un cliente', function () {
             'nombre' => 'Marta',
             'apellido' => 'Foto',
             'email' => 'marta.foto@example.com',
-            'foto' => UploadedFile::fake()->image('cliente.jpg', 200, 200),
+            'foto' => UploadedFile::fake()->createWithContent(
+                'cliente.png',
+                base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADUlEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC'),
+            ),
         ])
         ->assertRedirect('/clientes');
 
