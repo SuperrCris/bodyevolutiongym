@@ -44,6 +44,7 @@ class BiometricController extends Controller
             $respuesta['cliente'] = [
                 'id' => $cliente->id,
                 'nombre' => trim($cliente->nombre.' '.$cliente->apellido),
+                'foto' => $cliente->foto ? asset('storage/'.$cliente->foto) : null,
                 'plan' => $membresia?->plan?->nombre,
                 'vigente' => $membresia?->estaActiva() ?? false,
                 'vence' => $membresia?->finalizacion?->format('d/m/Y'),

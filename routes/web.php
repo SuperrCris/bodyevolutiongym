@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AjustesController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ClientesController;
 use App\Http\Controllers\EgresosController;
@@ -21,6 +22,9 @@ Route::middleware('guest')->group(function (): void {
 
 Route::middleware('auth')->group(function (): void {
     Route::post('/logout', [AuthController::class, 'destroy'])->name('logout');
+    Route::get('/ajustes', [AjustesController::class, 'index'])->name('ajustes.index');
+    Route::put('/ajustes/notificaciones', [AjustesController::class, 'actualizarNotificaciones'])
+        ->name('ajustes.notificaciones.update');
 
     Route::middleware('rol:recepcionista')->group(function (): void {
         Route::get('/clientes', [ClientesController::class, 'index'])->name('clientes.index');
@@ -40,6 +44,8 @@ Route::middleware('auth')->group(function (): void {
     });
 
     Route::middleware('rol:administrador')->group(function (): void {
+        Route::put('/ajustes/ticket', [AjustesController::class, 'actualizarTicket'])
+            ->name('ajustes.ticket.update');
         Route::put('/membresias/{membresia}/vigencia', [ClientesController::class, 'actualizarVigencia'])
             ->name('membresias.vigencia.update');
         Route::get('/tipos-de-membresia', [TiposMembresiaController::class, 'index'])->name('tipos-membresia.index');

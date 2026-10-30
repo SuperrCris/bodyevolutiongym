@@ -33,47 +33,78 @@
     </div>
 -->
     <div class="panel p-5">
-        <form method="GET" class="flex flex-col gap-3 sm:flex-row">
+    <form method="GET" class="flex flex-col gap-3 xl:flex-row">
             <input name="buscar" value="{{ request('buscar') }}" class="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm outline-none focus:border-teal-300/60" placeholder="Buscar por nombre...">
             <button class="rounded-2xl border border-white/10 px-5 py-3 text-sm font-semibold text-slate-300 transition hover:border-teal-300/50 hover:text-teal-200">Buscar</button>
             @if (request()->filled('buscar'))
                 <a href="{{ route('clientes.index') }}" class="inline-flex items-center justify-center rounded-2xl border border-white/10 px-5 py-3 text-sm font-semibold text-slate-300 transition hover:border-amber-300/40 hover:text-amber-200">Limpiar búsqueda</a>
             @endif
-        </form>
-    </div>
+        <div class="flex items-center gap-2 xl:ml-auto">
+            <span class="mr-1 text-xs font-medium text-slate-400">Vista</span>
+            <div role="group" aria-label="Modo de visualización de clientes" class="inline-flex rounded-xl border border-white/10 bg-slate-950/60 p-1">
+                <button
+                    type="button"
+                    data-client-view="tarjetas"
+                    aria-pressed="true"
+                    class="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-slate-300 transition hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300 aria-pressed:bg-teal-300 aria-pressed:text-slate-950"
+                >
+                    <svg class="size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                        <path d="M3 3h5v5H3zM12 3h5v5h-5zM3 12h5v5H3zM12 12h5v5h-5z" stroke="currentColor" stroke-width="1.5" />
+                    </svg>
+                    Tarjetas
+                </button>
+                <button
+                    type="button"
+                    data-client-view="lista"
+                    aria-pressed="false"
+                    class="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-slate-300 transition hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300 aria-pressed:bg-teal-300 aria-pressed:text-slate-950"
+                >
+                    <svg class="size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                        <path d="M7 5h10M7 10h10M7 15h10M3 5h.01M3 10h.01M3 15h.01" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" />
+                    </svg>
+                    Lista
+                </button>
+            </div>
+            <span data-client-view-status role="status" aria-live="polite" class="sr-only">Vista de tarjetas</span>
+        </div>
+    </form>
+</div>
 
-    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        @forelse ($clientes as $cliente)
-            @php($membresia = $cliente->membresias->first())
-            @php($tieneHuella = $cliente->credencialesBiometricas->isNotEmpty())
-            <article class="flex h-full flex-col gap-4 rounded-3xl border border-white/10 bg-white/[0.045] p-4 transition hover:border-teal-300/30 hover:bg-white/[0.06]">
-                <div class="flex min-w-0 items-start gap-3">
+<div data-clientes-lista data-view-mode="tarjetas" class="group grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+    @forelse ($clientes as $cliente)
+        @php($membresia = $cliente->membresias->first())
+        @php($tieneHuella = $cliente->credencialesBiometricas->isNotEmpty())
+        <article
+            data-cliente-card
+            class="flex h-full flex-col gap-4 rounded-3xl border border-white/10 bg-white/[0.045] p-4 transition hover:border-teal-300/30 hover:bg-white/[0.06] group-data-[view-mode=lista]:h-auto group-data-[view-mode=lista]:grid group-data-[view-mode=lista]:grid-cols-1 group-data-[view-mode=lista]:gap-2 group-data-[view-mode=lista]:rounded-xl group-data-[view-mode=lista]:p-2 sm:group-data-[view-mode=lista]:col-span-2 sm:group-data-[view-mode=lista]:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] xl:group-data-[view-mode=lista]:col-span-3 xl:group-data-[view-mode=lista]:grid-cols-[minmax(14rem,1.1fr)_minmax(13rem,1fr)_minmax(9rem,auto)]"
+        >
+            <div class="flex min-w-0 items-start gap-3 group-data-[view-mode=lista]:items-center group-data-[view-mode=lista]:gap-2">
                     @if ($cliente->foto)
-                        <img src="{{ asset('storage/'.$cliente->foto) }}" alt="Foto de {{ $cliente->nombre }} {{ $cliente->apellido }}" class="size-12 shrink-0 rounded-2xl object-cover ring-1 ring-white/10">
+                    <img src="{{ asset('storage/'.$cliente->foto) }}" alt="Foto de {{ $cliente->nombre }} {{ $cliente->apellido }}" class="size-12 shrink-0 rounded-2xl object-cover ring-1 ring-white/10 group-data-[view-mode=lista]:size-9 group-data-[view-mode=lista]:rounded-xl">
                     @else
-                        <div class="grid size-12 shrink-0 place-items-center rounded-2xl bg-slate-800 text-base font-black text-teal-300">{{ strtoupper(substr($cliente->nombre, 0, 1).substr($cliente->apellido, 0, 1)) }}</div>
+                    <div class="grid size-12 shrink-0 place-items-center rounded-2xl bg-slate-800 text-base font-black text-teal-300 group-data-[view-mode=lista]:size-9 group-data-[view-mode=lista]:rounded-xl group-data-[view-mode=lista]:text-xs">{{ strtoupper(substr($cliente->nombre, 0, 1).substr($cliente->apellido, 0, 1)) }}</div>
                     @endif
                     <div class="min-w-0 flex-1">
-                        <h2 class="truncate text-base font-bold" title="#{{ $cliente->id }} - {{ $cliente->nombre }} {{ $cliente->apellido }}">#{{ $cliente->id }} - {{ $cliente->nombre }} {{ $cliente->apellido }}</h2>
-                        <p class="mt-1 truncate text-sm text-slate-400" title="{{ $cliente->telefono ?: 'Sin teléfono' }}">{{ $cliente->telefono ?: 'Sin teléfono' }}</p>
-                        <span class="mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {{ $membresia?->estaActiva() ? 'bg-teal-300/15 text-teal-200' : 'bg-amber-300/15 text-amber-200' }}">{{ $membresia?->estaActiva() ? 'Membresía activa' : 'Sin plan activo' }}</span>
+                    <h2 class="truncate text-base font-bold group-data-[view-mode=lista]:text-sm" title="#{{ $cliente->id }} - {{ $cliente->nombre }} {{ $cliente->apellido }}">#{{ $cliente->id }} - {{ $cliente->nombre }} {{ $cliente->apellido }}</h2>
+                    <p class="mt-1 truncate text-sm text-slate-400 group-data-[view-mode=lista]:mt-0 group-data-[view-mode=lista]:text-xs" title="{{ $cliente->telefono ?: 'Sin teléfono' }}">{{ $cliente->telefono ?: 'Sin teléfono' }}</p>
+                    <span class="mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold group-data-[view-mode=lista]:mt-1 group-data-[view-mode=lista]:px-2 group-data-[view-mode=lista]:py-0.5 group-data-[view-mode=lista]:text-[0.65rem] {{ $membresia?->estaActiva() ? 'bg-teal-300/15 text-teal-200' : 'bg-amber-300/15 text-amber-200' }}">{{ $membresia?->estaActiva() ? 'Membresía activa' : 'Sin plan activo' }}</span>
                     </div>
                 </div>
-                <div class="grid grid-cols-2 gap-3 rounded-2xl bg-slate-950/50 p-3">
+                <div class="grid grid-cols-2 gap-3 rounded-2xl bg-slate-950/50 p-3 group-data-[view-mode=lista]:gap-x-5 group-data-[view-mode=lista]:gap-y-2 group-data-[view-mode=lista]:bg-transparent group-data-[view-mode=lista]:p-0">
                     <div class="min-w-0">
-                        <p class="text-xs text-slate-500">Plan actual</p>
-                        <p class="mt-1 truncate text-sm font-semibold" title="{{ $membresia?->plan?->nombre ?: '—' }}">{{ $membresia?->plan?->nombre ?: '—' }}</p>
+                    <p class="text-xs text-slate-500 group-data-[view-mode=lista]:text-[0.65rem]">Plan actual</p>
+                    <p class="mt-1 truncate text-sm font-semibold group-data-[view-mode=lista]:mt-0.5 group-data-[view-mode=lista]:text-xs" title="{{ $membresia?->plan?->nombre ?: '—' }}">{{ $membresia?->plan?->nombre ?: '—' }}</p>
                     </div>
                     <div class="min-w-0">
-                        <p class="text-xs text-slate-500">Vigencia</p>
-                        <p class="mt-1 text-sm font-semibold">{{ $membresia?->finalizacion?->format('d/m/Y') ?: '—' }}</p>
+                    <p class="text-xs text-slate-500 group-data-[view-mode=lista]:text-[0.65rem]">Vigencia</p>
+                    <p class="mt-1 text-sm font-semibold group-data-[view-mode=lista]:mt-0.5 group-data-[view-mode=lista]:text-xs">{{ $membresia?->finalizacion?->format('d/m/Y') ?: '—' }}</p>
                     </div>
                     @if ($membresia && auth()->user()->esAdministrador())
                         @include('clientes.partials.vigencia', ['membresia' => $membresia])
                     @endif
-                    <div class="col-span-2 flex items-center gap-2 border-t border-white/10 pt-3">
-                        <span data-huella-indicador="{{ $cliente->id }}" class="relative grid size-6 shrink-0 place-items-center">
-                            <svg class="size-5 text-slate-300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <div class="col-span-2 flex items-center gap-2 border-t border-white/10 pt-3 group-data-[view-mode=lista]:border-t-0 group-data-[view-mode=lista]:pt-0">
+                        <span data-huella-indicador="{{ $cliente->id }}" class="relative grid size-6 shrink-0 place-items-center group-data-[view-mode=lista]:size-5">
+                            <svg class="size-5 text-slate-300 group-data-[view-mode=lista]:size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                                 <path d="M5 11a7 7 0 0 1 14 0v2M7.5 10.5a4.5 4.5 0 0 1 9 0v3M10 10.5a2 2 0 0 1 4 0v4a8 8 0 0 1-1.25 4.3M12 12v3a10 10 0 0 1-1.5 5.5M9 13v1a5 5 0 0 1-.75 2.5M17 13v1.5a12 12 0 0 1-1 4" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" />
                             </svg>
                             <span class="absolute -bottom-0.5 -right-0.5 grid size-3.5 place-items-center rounded-full bg-slate-900">
@@ -85,10 +116,10 @@
                                 </svg>
                             </span>
                         </span>
-                        <span data-huella-estado="{{ $cliente->id }}" class="text-sm font-semibold {{ $tieneHuella ? 'text-teal-200' : 'text-slate-300' }}">{{ $tieneHuella ? 'Huella registrada' : 'Huella sin registrar' }}</span>
+                        <span data-huella-estado="{{ $cliente->id }}" class="text-sm font-semibold group-data-[view-mode=lista]:text-xs {{ $tieneHuella ? 'text-teal-200' : 'text-slate-300' }}">{{ $tieneHuella ? 'Huella registrada' : 'Huella sin registrar' }}</span>
                     </div>
                 </div>
-                <div class="mt-auto flex gap-2 border-t border-white/10 pt-3">
+                <div class="mt-auto flex gap-2 border-t border-white/10 pt-3 group-data-[view-mode=lista]:mt-0 sm:group-data-[view-mode=lista]:col-span-2 sm:group-data-[view-mode=lista]:justify-end sm:group-data-[view-mode=lista]:border-t-0 sm:group-data-[view-mode=lista]:pt-0 xl:group-data-[view-mode=lista]:col-span-1 xl:group-data-[view-mode=lista]:border-l xl:group-data-[view-mode=lista]:pl-3">
                     <button type="button" data-open-modal="editar-{{ $cliente->id }}" class="min-h-11 flex-1 rounded-xl border border-white/10 px-3 py-2 text-sm font-semibold text-slate-300 transition hover:border-teal-300/50 hover:text-teal-200">Editar</button>
                     <button type="button" data-open-modal="renovar-{{ $cliente->id }}" class="button-primary min-h-11 flex-1 px-3 py-2 text-sm transition">Renovar</button>
                 </div>
@@ -154,6 +185,51 @@
 @push('scripts')
 <script>
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
+    const clientesLista = document.querySelector('[data-clientes-lista]');
+    const botonesVistaClientes = document.querySelectorAll('[data-client-view]');
+    const estadoVistaClientes = document.querySelector('[data-client-view-status]');
+
+    if (clientesLista && botonesVistaClientes.length > 0) {
+        let vistaInicial = 'tarjetas';
+        let avisoPreferenciaVista = '';
+
+        try {
+            const vistaGuardada = localStorage.getItem('bodyevolution-clientes-vista');
+            if (vistaGuardada === 'lista' || vistaGuardada === 'tarjetas') {
+                vistaInicial = vistaGuardada;
+            }
+        } catch (error) {
+            console.error('No se pudo leer la preferencia de vista de clientes.', error);
+            avisoPreferenciaVista = 'No se pudo leer la preferencia guardada; se muestra la vista de tarjetas.';
+        }
+
+        function aplicarVistaClientes(vista) {
+            clientesLista.dataset.viewMode = vista;
+            botonesVistaClientes.forEach((boton) => {
+                boton.setAttribute('aria-pressed', String(boton.dataset.clientView === vista));
+            });
+            estadoVistaClientes.textContent = `Vista de ${vista}${avisoPreferenciaVista ? `. ${avisoPreferenciaVista}` : ''}`;
+        }
+
+        aplicarVistaClientes(vistaInicial);
+
+        botonesVistaClientes.forEach((boton) => boton.addEventListener('click', () => {
+            const vista = boton.dataset.clientView;
+            if (vista !== 'lista' && vista !== 'tarjetas') return;
+
+            avisoPreferenciaVista = '';
+            aplicarVistaClientes(vista);
+
+            try {
+                localStorage.setItem('bodyevolution-clientes-vista', vista);
+            } catch (error) {
+                console.error('No se pudo guardar la preferencia de vista de clientes.', error);
+                avisoPreferenciaVista = 'La preferencia no pudo guardarse y solo se conservará durante esta visita.';
+                estadoVistaClientes.textContent = `Vista de ${vista}. ${avisoPreferenciaVista}`;
+            }
+        }));
+    }
+
     document.querySelectorAll('[data-open-modal]').forEach((button) => button.addEventListener('click', () => {
         const modal = document.getElementById(button.dataset.openModal);
         modal.classList.remove('hidden'); modal.classList.add('flex');

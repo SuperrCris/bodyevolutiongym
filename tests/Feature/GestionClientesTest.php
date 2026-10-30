@@ -288,6 +288,29 @@ test('muestra la opción de actualizar la huella existente en la edición del cl
         ->assertSee('Hay una huella registrada. Captura de nuevo para reemplazarla.');
 });
 
+test('muestra las vistas de tarjetas y lista sin quitar acciones de clientes', function () {
+    $usuario = Usuario::create([
+        'name' => 'Operador',
+        'email' => 'operador.vistas@example.com',
+        'password' => 'password',
+    ]);
+    $cliente = Cliente::create([
+        'nombre' => 'Ana',
+        'apellido' => 'García',
+    ]);
+
+    $this->actingAs($usuario)
+        ->get(route('clientes.index'))
+        ->assertOk()
+        ->assertSee('data-clientes-lista data-view-mode="tarjetas"', false)
+        ->assertSee('data-client-view="tarjetas"', false)
+        ->assertSee('data-client-view="lista"', false)
+        ->assertSee('aria-label="Modo de visualización de clientes"', false)
+        ->assertSee('data-cliente-card', false)
+        ->assertSee('data-open-modal="editar-'.$cliente->id.'"', false)
+        ->assertSee('data-open-modal="renovar-'.$cliente->id.'"', false);
+});
+
 test('un operador puede buscar un cliente por su ID', function () {
     $usuario = Usuario::create([
         'name' => 'Operador',
