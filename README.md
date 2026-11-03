@@ -29,6 +29,20 @@ In addition, [Laracasts](https://laracasts.com) contains thousands of video tuto
 
 You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
 
+## Inicializar una máquina nueva
+
+Después de clonar el proyecto y configurar PostgreSQL, ejecuta PowerShell desde la raíz del proyecto:
+
+```powershell
+.\inicializar-base.ps1
+```
+
+El script crea `.env` si no existe, genera `APP_KEY` únicamente cuando está vacío, instala las dependencias PHP si `vendor` aún no existe y ejecuta las migraciones junto con los datos iniciales. No elimina ni reinicia tablas existentes.
+
+Antes de ejecutarlo, revisa en `.env` `DB_CONNECTION`, `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME` y `DB_PASSWORD` para que correspondan a la base de datos de la máquina.
+
+El usuario inicial creado por el seeder es `cristian` con contraseña `password`. Cambia esa contraseña después del primer inicio de sesión.
+
 ## Agentic Development
 
 Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
