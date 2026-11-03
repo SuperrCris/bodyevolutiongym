@@ -30,6 +30,10 @@
             text-align: center;
         }
 
+        .texto-ticket {
+            white-space: pre-line;
+        }
+
         .logo {
             display: block;
             width: 60mm;
@@ -105,6 +109,9 @@
     <main class="ticket">
         <header class="centrado">
             <img class="logo" src="{{ asset('images/logo.png') }}" alt="Body Evolution Gym">
+            @if (filled($configuracionTicket['encabezado']))
+                <p class="texto-ticket">{{ $configuracionTicket['encabezado'] }}</p>
+            @endif
             <p>RECIBO DE PAGO</p>
         </header>
 
@@ -129,7 +136,9 @@
         <div class="fila total"><span>Total</span><span>${{ number_format((float) $pago->monto, 2) }}</span></div>
 
         <hr class="separador">
-        <p class="centrado">¡Gracias por tu preferencia!</p>
+        @if (filled($configuracionTicket['pie']))
+            <p class="centrado texto-ticket">{{ $configuracionTicket['pie'] }}</p>
+        @endif
     </main>
 
     @if (session('error'))

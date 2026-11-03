@@ -12,7 +12,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
 
-#[Fillable(['name', 'username', 'role', 'email', 'password'])]
+#[Fillable(['name', 'username', 'role', 'email', 'password', 'duracion_notificacion_segundos'])]
 #[Hidden(['password', 'remember_token'])]
 class Usuario extends Authenticatable
 {
@@ -22,6 +22,7 @@ class Usuario extends Authenticatable
 
     protected $attributes = [
         'role' => self::ROLE_RECEPCIONISTA,
+        'duracion_notificacion_segundos' => 20,
     ];
 
     /** @use HasFactory<UserFactory> */
@@ -60,6 +61,7 @@ class Usuario extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'duracion_notificacion_segundos' => 'integer',
         ];
     }
 

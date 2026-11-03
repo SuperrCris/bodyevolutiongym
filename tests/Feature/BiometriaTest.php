@@ -261,13 +261,18 @@ test('actualizar la huella desactiva la credencial anterior', function () {
         ->and(CredencialBiometrica::query()->where('id_cliente', $cliente->id)->where('estado', true)->count())->toBe(1);
 });
 
-test('el sondeo continuo identifica al cliente y devuelve su membresía', function () {
+test('el sondeo continuo identifica al cliente y devuelve su foto y membresía', function () {
     Http::fake([
         'http://127.0.0.1:8765/poll*' => Http::response(['seq' => 4, 'sample' => base64_encode('muestra')]),
         'http://127.0.0.1:8765/identificar' => coincidirConCandidatos(),
     ]);
 
-    $cliente = Cliente::create(['nombre' => 'Ana', 'apellido' => 'Gómez', 'email' => 'ana.scan@example.com']);
+    $cliente = Cliente::create([
+        'nombre' => 'Ana',
+        'apellido' => 'Gómez',
+        'email' => 'ana.scan@example.com',
+        'foto' => 'clientes/ana.jpg',
+    ]);
     $cliente->credencialesBiometricas()->create([
         'proveedor' => 'digitalpersona',
         'id_externo' => 'credencial-scan',
@@ -282,6 +287,7 @@ test('el sondeo continuo identifica al cliente y devuelve su membresía', functi
         ->assertJsonPath('seq', 4)
         ->assertJsonPath('matched', true)
         ->assertJsonPath('cliente.nombre', 'Ana Gómez')
+        ->assertJsonPath('cliente.foto', asset('storage/clientes/ana.jpg'))
         ->assertJsonPath('cliente.vigente', false);
 });
 

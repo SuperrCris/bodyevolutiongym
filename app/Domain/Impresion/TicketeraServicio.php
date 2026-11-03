@@ -2,6 +2,7 @@
 
 namespace App\Domain\Impresion;
 
+use App\Domain\Ajustes\AjustesTicketServicio;
 use App\Models\Pago;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
@@ -9,6 +10,8 @@ use Illuminate\Support\Str;
 
 class TicketeraServicio
 {
+    public function __construct(private AjustesTicketServicio $ajustesTicket) {}
+
     public function imprimir(Pago $pago, int $copias = 2): string
     {
         if (! in_array($copias, [1, 2], true)) {
@@ -69,11 +72,17 @@ class TicketeraServicio
             throw new TicketeraException('No se pudo leer el logo para imprimir el recibo.');
         }
 
+        $configuracionTicket = $this->ajustesTicket->obtenerConfiguracion();
+        $lineasEncabezado = $configuracionTicket['encabezado'] === ''
+            ? []
+            : explode("\n", $configuracionTicket['encabezado']);
+
+        if (isset($lineasEncabezado[0]) && $lineasEncabezado[0] !== '') {
+            $lineasEncabezado[0] .= '?n';
+        }
+
         $lineas = [
-            'BODY EVOLUTION GYM'.'?n',
-            'JOSE ROSARIO GUTIERREZ MELENDEZ',
-            'GUMR790402B66',
-            '6421095410',
+            ...$lineasEncabezado,
             str_repeat('-', 32),
             'Cliente: #'.$pago->cliente?->id.' •  '.Str::squish(trim(($pago->cliente?->nombre ?? '').' '.($pago->cliente?->apellido ?? ''))),
             'Membresia '.Str::lower(Str::squish($pago->membresia?->plan?->nombre ?? '—')),
@@ -99,8 +108,11 @@ class TicketeraServicio
 
         $lineas[] = str_repeat('-', 32);
         $lineas[] = 'TOTAL: $'.number_format((float) $pago->monto, 2, '.', ',');
-        $lineas[] = '';
-        $lineas[] = '¡Gracias por tu preferencia!';
+
+        if ($configuracionTicket['pie'] !== '') {
+            $lineas[] = '';
+            array_push($lineas, ...explode("\n", $configuracionTicket['pie']));
+        }
 
         return "BEG-PRINT-V2\n{$copias}\n".base64_encode($logo)."\n\n".implode("\n", $lineas)."\n";
     }

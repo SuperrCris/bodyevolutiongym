@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Ajustes\AjustesTicketServicio;
 use App\Domain\Auditoria\AuditoriaServicio;
 use App\Domain\Impresion\TicketeraException;
 use App\Domain\Impresion\TicketeraServicio;
@@ -207,12 +208,13 @@ class ClientesController extends Controller
         return $this->enviarRecibo($pago, $ticketera);
     }
 
-    public function receipt(Pago $pago): View
+    public function receipt(Pago $pago, AjustesTicketServicio $ajustesTicket): View
     {
         $pago->load(['cliente', 'membresia.plan', 'usuario']);
 
         return view('pagos.recibo', [
             'pago' => $pago,
+            'configuracionTicket' => $ajustesTicket->obtenerConfiguracion(),
             'metodoPago' => match ($pago->metodo_pago) {
                 'efectivo' => 'Efectivo',
                 'tarjeta' => 'Tarjeta',
