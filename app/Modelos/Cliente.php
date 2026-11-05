@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['nombre', 'apellido', 'email', 'telefono', 'documento', 'fecha_nacimiento', 'direccion', 'foto', 'estado'])]
+#[Fillable(['nombre', 'apellido', 'email', 'telefono', 'documento', 'fecha_nacimiento', 'direccion', 'foto', 'foto_documento', 'estado'])]
 #[SoftDeletable]
 class Cliente extends Model
 {

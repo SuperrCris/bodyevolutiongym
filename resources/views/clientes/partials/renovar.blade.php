@@ -1,6 +1,12 @@
 <div id="renovar-{{ $cliente->id }}" data-modal class="modal-backdrop z-50 hidden bg-slate-950/80">
     <div class="modal-panel max-h-[calc(100vh-3rem)] w-full max-w-lg overflow-y-auto">
         <div class="flex items-center justify-between"><h2 class="text-xl font-bold">Renovar membresía</h2><button type="button" data-close-modal class="text-2xl text-slate-500 hover:text-white">×</button></div>
+        @if ($cliente->foto_documento)
+            <div class="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                <p class="mb-2 text-sm font-semibold text-slate-300">Documento del cliente</p>
+                <img src="{{ route('clientes.documento', $cliente) }}" alt="Documento de {{ $cliente->nombre }} {{ $cliente->apellido }}" class="mx-auto max-h-52 max-w-full rounded-lg object-contain">
+            </div>
+        @endif
         <form method="POST" action="{{ route('clientes.renovar', $cliente) }}" class="mt-6 space-y-4">
             @csrf
             <label class="block">

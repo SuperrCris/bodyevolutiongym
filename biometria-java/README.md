@@ -17,6 +17,8 @@ El lector debe estar conectado y sus controladores DigitalPersona instalados. La
 
 `POST /identificar` recibe la muestra y un lote de plantillas candidatas (`{"sample": "...", "candidatos": [{"id": "1", "template": "..."}], "todas": false}`), extrae las características de la muestra una sola vez y las compara con cada plantilla en memoria. Responde `{"coincidencias": ["1"], "evaluadas": N, "invalidas": 0}`. Con `"todas": true` evalúa todo el lote en vez de detenerse en la primera coincidencia. Laravel envía los lotes según `BIOMETRIA_LOTE_IDENTIFICACION` (250 por defecto). Recompile y reinicie el puente tras actualizar.
 
+Laravel inicia el sondeo al cargar una página autenticada; la primera consulta a `/poll` activa la captura continua. La captura se pausa durante operaciones exclusivas y se reanuda al terminar.
+
 ## Impresión de recibos
 
 El endpoint local `POST /imprimir` envía un único trabajo a la impresora predeterminada de Windows con una o dos copias completas del recibo, en páginas consecutivas; no crea un segundo pago ni requiere una segunda solicitud. El protocolo actual (`BEG-PRINT-V2`) indica la cantidad de copias; las solicitudes anteriores `BEG-PRINT-V1` siguen imprimiendo dos.

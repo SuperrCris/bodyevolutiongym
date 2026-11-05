@@ -30,6 +30,8 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/clientes', [ClientesController::class, 'index'])->name('clientes.index');
         Route::post('/clientes', [ClientesController::class, 'store'])->name('clientes.store');
         Route::put('/clientes/{cliente}', [ClientesController::class, 'update'])->name('clientes.update');
+        Route::get('/clientes/{cliente}/documento', [ClientesController::class, 'mostrarDocumento'])
+            ->name('clientes.documento');
         Route::post('/clientes/{cliente}/renovar', [ClientesController::class, 'renovar'])->name('clientes.renovar');
         Route::get('/pagos/{pago}/recibo', [ClientesController::class, 'receipt'])->name('pagos.recibo');
         Route::post('/pagos/{pago}/imprimir', [ClientesController::class, 'printReceipt'])->name('pagos.imprimir');

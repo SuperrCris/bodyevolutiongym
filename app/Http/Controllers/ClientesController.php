@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ClientesController extends Controller
 {
@@ -78,6 +79,14 @@ class ClientesController extends Controller
             unset($data['foto']);
         }
 
+        $fotoDocumento = $request->file('foto_documento');
+
+        if ($fotoDocumento !== null) {
+            $data['foto_documento'] = $this->storeDocumentPhoto($fotoDocumento);
+        } else {
+            unset($data['foto_documento']);
+        }
+
         $cliente = Cliente::create($data);
         $redirect = to_route('clientes.index')->with('success', 'Cliente creado correctamente.');
 
@@ -92,12 +101,20 @@ class ClientesController extends Controller
     {
         $data = $this->validatedData($request, $cliente);
         $fotoAnterior = $cliente->foto;
+        $fotoDocumentoAnterior = $cliente->foto_documento;
         $foto = $request->file('foto');
+        $fotoDocumento = $request->file('foto_documento');
 
         if ($foto !== null) {
             $data['foto'] = $this->storePhoto($foto);
         } else {
             unset($data['foto']);
+        }
+
+        if ($fotoDocumento !== null) {
+            $data['foto_documento'] = $this->storeDocumentPhoto($fotoDocumento);
+        } else {
+            unset($data['foto_documento']);
         }
 
         $cliente->update($data);
@@ -106,7 +123,21 @@ class ClientesController extends Controller
             Storage::disk('public')->delete($fotoAnterior);
         }
 
+        if ($fotoDocumento !== null && $fotoDocumentoAnterior !== null) {
+            Storage::disk('local')->delete($fotoDocumentoAnterior);
+        }
+
         return to_route('clientes.index')->with('success', 'Cliente actualizado correctamente.');
+    }
+
+    public function mostrarDocumento(Cliente $cliente): StreamedResponse
+    {
+        abort_if($cliente->foto_documento === null, 404);
+
+        return Storage::disk('local')->response($cliente->foto_documento, null, [
+            'Cache-Control' => 'private, no-store',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     public function renovar(
@@ -282,7 +313,25 @@ class ClientesController extends Controller
                 'max:5120',
                 'dimensions:max_width=2000,max_height=2000',
             ],
+            'foto_documento' => [
+                'nullable',
+                'image',
+                'mimes:jpeg,jpg,png,webp',
+                'max:5120',
+                'dimensions:max_width=6000,max_height=6000',
+            ],
         ]);
+    }
+
+    private function storeDocumentPhoto(UploadedFile $fotoDocumento): string
+    {
+        $path = $fotoDocumento->store('documentos/clientes', 'local');
+
+        if ($path === false) {
+            throw new \RuntimeException('No fue posible guardar la imagen del documento.');
+        }
+
+        return $path;
     }
 
     private function storePhoto(UploadedFile $foto): string

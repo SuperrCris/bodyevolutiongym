@@ -136,7 +136,7 @@
                 toast.appendChild(cerrar);
 
                 const cuerpo = document.createElement('div');
-                cuerpo.className = 'flex items-start gap-3 pr-7';
+                cuerpo.className = 'flex items-center gap-2 pr-7 sm:gap-3';
 
                 if (cliente !== null) {
                     const avatar = document.createElement('div');
@@ -183,20 +183,17 @@
                     d.textContent = detalle;
                     contenido.appendChild(d);
                 }
+                cuerpo.appendChild(contenido);
                 if (cliente !== null) {
                     const destinoRenovacion = new URL(contenedor.dataset.clientesUrl, window.location.origin);
                     destinoRenovacion.searchParams.set('abrir_renovacion', cliente.id);
 
-                    const acciones = document.createElement('div');
-                    acciones.className = 'mt-3 flex justify-end';
                     const renovar = document.createElement('a');
                     renovar.href = destinoRenovacion.toString();
-                    renovar.className = 'rounded-lg bg-teal-300 px-4 py-2 text-sm font-bold text-slate-950 transition hover:bg-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-200';
+                    renovar.className = 'shrink-0 whitespace-nowrap rounded-lg bg-teal-300 px-2.5 py-2 text-xs font-bold text-slate-950 transition hover:bg-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-200 sm:px-3 sm:text-sm';
                     renovar.textContent = 'Renovar';
-                    acciones.appendChild(renovar);
-                    contenido.appendChild(acciones);
+                    cuerpo.appendChild(renovar);
                 }
-                cuerpo.appendChild(contenido);
                 toast.appendChild(cuerpo);
 
                 const descripcionTemporizador = document.createElement('span');

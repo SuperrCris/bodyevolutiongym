@@ -62,8 +62,45 @@ test('un operador puede crear un cliente sin correo ni documento y guardar su di
 
     $response = $this->get('/clientes')->assertOk();
 
-    expect(substr_count($response->getContent(), 'name="documento"'))->toBe(2);
+    expect(substr_count($response->getContent(), 'name="foto_documento"'))->toBe(2);
     expect(substr_count($response->getContent(), 'name="direccion"'))->toBe(2);
+    expect(substr_count($response->getContent(), 'name="email"'))->toBe(0);
+    expect(substr_count($response->getContent(), 'name="fecha_nacimiento"'))->toBe(0);
+
+    $cliente = Cliente::query()->where('nombre', 'Lucía')->firstOrFail();
+
+    $this->get(route('clientes.index', ['abrir_renovacion' => $cliente->id]))
+        ->assertOk()
+        ->assertDontSee('Documento del cliente');
+});
+
+test('editar un cliente sin correo ni fecha de nacimiento conserva los datos existentes', function () {
+    $usuario = Usuario::create([
+        'name' => 'Operador',
+        'email' => 'operador.editar.datos@example.com',
+        'password' => 'password',
+    ]);
+    $cliente = Cliente::create([
+        'nombre' => 'Elena',
+        'apellido' => 'Ríos',
+        'email' => 'elena.rios@example.com',
+        'fecha_nacimiento' => '1998-05-10',
+    ]);
+
+    $this->actingAs($usuario)
+        ->put(route('clientes.update', $cliente), [
+            'nombre' => 'Elena',
+            'apellido' => 'Ríos',
+            'telefono' => '555123456',
+            'direccion' => 'Calle Norte 45',
+        ])
+        ->assertRedirect('/clientes');
+
+    $this->assertDatabaseHas('clientes', [
+        'id' => $cliente->id,
+        'email' => 'elena.rios@example.com',
+        'fecha_nacimiento' => '1998-05-10',
+    ]);
 });
 
 test('el formulario de nuevo cliente muestra guardar y asignar huella sin mostrar progreso de enrolamiento', function () {
@@ -859,4 +896,73 @@ test('un operador puede guardar la foto de un cliente', function () {
 
     expect($cliente->foto)->not->toBeNull();
     Storage::disk('public')->assertExists($cliente->foto);
+});
+
+test('un operador puede guardar y ver la imagen del documento al renovar', function () {
+    Storage::fake('local');
+    $usuario = Usuario::create([
+        'name' => 'Operador',
+        'email' => 'operador.documento@example.com',
+        'password' => 'password',
+    ]);
+
+    $this->actingAs($usuario)
+        ->post('/clientes', [
+            'nombre' => 'Marta',
+            'apellido' => 'Documento',
+            'foto_documento' => UploadedFile::fake()->image('documento.jpg'),
+        ])
+        ->assertRedirect('/clientes');
+
+    $cliente = Cliente::query()->where('apellido', 'Documento')->firstOrFail();
+
+    expect($cliente->foto_documento)->toStartWith('documentos/clientes/');
+    Storage::disk('local')->assertExists($cliente->foto_documento);
+
+    $this->get(route('clientes.documento', $cliente))
+        ->assertOk()
+        ->assertHeader('Content-Type', 'image/jpeg')
+        ->assertHeader('Cache-Control', 'no-store, private');
+
+    $this->get(route('clientes.index', ['abrir_renovacion' => $cliente->id]))
+        ->assertOk()
+        ->assertSee('Documento del cliente')
+        ->assertSee(route('clientes.documento', $cliente), false);
+});
+
+test('un operador puede agregar la imagen del documento al editar un cliente', function () {
+    Storage::fake('local');
+    $usuario = Usuario::create([
+        'name' => 'Operador',
+        'email' => 'operador.editar.documento@example.com',
+        'password' => 'password',
+    ]);
+    $cliente = Cliente::create([
+        'nombre' => 'Marta',
+        'apellido' => 'Actualización',
+    ]);
+
+    $this->actingAs($usuario)
+        ->put(route('clientes.update', $cliente), [
+            'nombre' => 'Marta',
+            'apellido' => 'Actualización',
+            'foto_documento' => UploadedFile::fake()->image('documento.png'),
+        ])
+        ->assertRedirect('/clientes');
+
+    $cliente->refresh();
+
+    expect($cliente->foto_documento)->not->toBeNull();
+    Storage::disk('local')->assertExists($cliente->foto_documento);
+});
+
+test('la imagen del documento no es accesible sin iniciar sesión', function () {
+    $cliente = Cliente::create([
+        'nombre' => 'Marta',
+        'apellido' => 'Privado',
+        'foto_documento' => 'documentos/clientes/documento.jpg',
+    ]);
+
+    $this->get(route('clientes.documento', $cliente))
+        ->assertRedirect(route('login'));
 });

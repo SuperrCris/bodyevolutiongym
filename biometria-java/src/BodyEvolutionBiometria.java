@@ -191,6 +191,8 @@ public final class BodyEvolutionBiometria {
     }
 
     private static String poll(String query) {
+        iniciarEscucha();
+
         long after = -1;
         if (query != null) {
             Matcher matcher = Pattern.compile("(?:^|&)after=(\\d+)").matcher(query);
@@ -203,6 +205,28 @@ public final class BodyEvolutionBiometria {
                 return "{\"seq\":" + sampleSeq + ",\"sample\":\"" + lastSample + "\"}";
             }
             return "{\"seq\":" + sampleSeq + "}";
+        }
+    }
+
+    private static void iniciarEscucha() {
+        if (!CAPTURE_LOCK.tryLock()) {
+            return;
+        }
+
+        try {
+            synchronized (LISTENER_LOCK) {
+                if (escuchando) {
+                    return;
+                }
+
+                if (listener != null) {
+                    listener.startCapture();
+                }
+
+                escuchando = true;
+            }
+        } finally {
+            CAPTURE_LOCK.unlock();
         }
     }
 

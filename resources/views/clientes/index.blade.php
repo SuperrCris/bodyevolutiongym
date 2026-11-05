@@ -168,7 +168,7 @@
         <div class="flex items-center justify-between gap-4">
             <div>
                 <h2 class="text-xl font-bold">Capturar foto</h2>
-                <p class="mt-1 text-sm text-slate-400">Acomoda el rostro dentro del encuadre y presiona capturar.</p>
+                <p class="mt-1 text-sm text-slate-400">Acomoda el rostro o el documento dentro del encuadre y presiona capturar.</p>
             </div>
             <button type="button" data-close-camera class="text-2xl text-slate-500 hover:text-white" aria-label="Cerrar cámara">×</button>
         </div>
@@ -266,14 +266,16 @@
             window.location.reload();
         }
     }));
-    document.querySelectorAll('[data-foto-input]').forEach((input) => input.addEventListener('change', () => {
-        const preview = input.closest('form').querySelector('[data-foto-preview]');
-        const placeholder = input.closest('form').querySelector('[data-foto-placeholder]');
+    document.querySelectorAll('[data-image-preview-input]').forEach((input) => input.addEventListener('change', () => {
+        const previewType = input.dataset.imagePreviewInput;
+        const form = input.closest('form');
+        const preview = form?.querySelector(`[data-${previewType}-preview]`);
+        const placeholder = form?.querySelector(`[data-${previewType}-placeholder]`);
         const file = input.files?.[0];
-        if (!file) return;
+        if (!file || !preview) return;
         preview.src = URL.createObjectURL(file);
         preview.classList.remove('hidden');
-        placeholder.classList.add('hidden');
+        placeholder?.classList.add('hidden');
     }));
     const cameraModal = document.querySelector('[data-camera-modal]');
     const cameraVideo = cameraModal?.querySelector('[data-camera-video]');
@@ -291,7 +293,8 @@
     }
 
     document.querySelectorAll('[data-open-camera]').forEach((button) => button.addEventListener('click', async () => {
-        cameraInput = button.closest('form')?.querySelector('[data-foto-input]');
+        const cameraTarget = button.dataset.openCamera;
+        cameraInput = button.closest('form')?.querySelector(`[data-camera-input="${cameraTarget}"]`);
         if (!cameraInput || !cameraModal || !cameraVideo || !cameraCanvas) return;
 
         if (!navigator.mediaDevices?.getUserMedia) {
@@ -301,7 +304,7 @@
 
         try {
             cameraStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'user' },
+                video: { facingMode: cameraTarget === 'documento' ? 'environment' : 'user' },
                 audio: false,
             });
             cameraVideo.srcObject = cameraStream;
@@ -329,7 +332,7 @@
                 return;
             }
 
-            const archivo = new File([blob], `cliente-${Date.now()}.jpg`, { type: 'image/jpeg' });
+            const archivo = new File([blob], `${cameraInput.dataset.cameraInput}-cliente-${Date.now()}.jpg`, { type: 'image/jpeg' });
             const archivos = new DataTransfer();
             archivos.items.add(archivo);
             cameraInput.files = archivos.files;
