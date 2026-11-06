@@ -90,8 +90,8 @@
                         <tbody class="divide-y divide-white/5">
                             @forelse ($movimientos as $movimiento)
                                 <tr data-membership-row class="transition hover:bg-white/[0.025]">
-                                    <td class="whitespace-nowrap px-4 py-3 font-semibold text-slate-300">{{ $movimiento->cliente_id }}</td>
-                                    <td class="whitespace-nowrap px-4 py-3 font-medium text-white">{{ trim($movimiento->cliente_nombre.' '.$movimiento->cliente_apellido) }}</td>
+                                    <td class="whitespace-nowrap px-4 py-3 font-semibold text-slate-300">{{ $movimiento->cliente_id ?? '—' }}</td>
+                                    <td class="whitespace-nowrap px-4 py-3 font-medium text-white">{{ $movimiento->cliente_id === null ? ($movimiento->nombre_comprador ?: 'Venta sin cliente') : trim($movimiento->cliente_nombre.' '.$movimiento->cliente_apellido) }}</td>
                                     <td class="whitespace-nowrap px-4 py-3 text-slate-400">{{ \Illuminate\Support\Carbon::parse($movimiento->fecha)->format('d/m/Y H:i') }}</td>
                                     <td class="px-4 py-3">
                                         @php

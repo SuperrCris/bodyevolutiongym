@@ -17,6 +17,7 @@
                 </a>
                 <nav class="flex flex-wrap items-center gap-2 text-sm text-slate-300">
                     <a href="{{ route('clientes.index') }}" class="rounded-xl px-3 py-2 transition hover:bg-white/5 hover:text-teal-200">Clientes</a>
+                    <a href="{{ route('ventas.index') }}" class="rounded-xl px-3 py-2 transition hover:bg-white/5 hover:text-teal-200">Ventas</a>
                     <a href="{{ route('reportes.index') }}" class="rounded-xl px-3 py-2 transition hover:bg-white/5 hover:text-teal-200">Reportes</a>
                     <a href="{{ route('ajustes.index') }}" class="rounded-xl px-3 py-2 transition hover:bg-white/5 hover:text-teal-200">Ajustes</a>
                     @if (auth()->user()->esAdministrador())

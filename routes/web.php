@@ -8,6 +8,7 @@ use App\Http\Controllers\EmpleadosController;
 use App\Http\Controllers\RegistrosController;
 use App\Http\Controllers\ReportesController;
 use App\Http\Controllers\TiposMembresiaController;
+use App\Http\Controllers\VentasController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/clientes');
@@ -36,6 +37,10 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/pagos/{pago}/recibo', [ClientesController::class, 'receipt'])->name('pagos.recibo');
         Route::post('/pagos/{pago}/imprimir', [ClientesController::class, 'printReceipt'])->name('pagos.imprimir');
         Route::get('/clientes/resumen', [ClientesController::class, 'resumen'])->name('clientes.resumen');
+        Route::get('/ventas', [VentasController::class, 'index'])->name('ventas.index');
+        Route::post('/ventas', [VentasController::class, 'store'])->name('ventas.store');
+        Route::put('/ventas/{pago}/metodo', [VentasController::class, 'actualizarMetodo'])
+            ->name('ventas.metodo.update');
         Route::get('/egresos', [EgresosController::class, 'index'])->name('egresos.index');
         Route::post('/egresos', [EgresosController::class, 'store'])->name('egresos.store');
         Route::get('/reportes', [ReportesController::class, 'index'])->name('reportes.index');

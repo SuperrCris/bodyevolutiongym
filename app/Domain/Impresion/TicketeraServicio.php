@@ -18,7 +18,7 @@ class TicketeraServicio
             throw new TicketeraException('La cantidad de tickets solicitada no es válida.');
         }
 
-        $pago->loadMissing(['cliente', 'membresia.plan', 'usuario']);
+        $pago->loadMissing(['cliente', 'membresia.plan', 'plan', 'usuario']);
 
         try {
             $respuesta = Http::acceptJson()
@@ -84,23 +84,32 @@ class TicketeraServicio
         $lineas = [
             ...$lineasEncabezado,
             str_repeat('-', 32),
-            'Cliente: #'.$pago->cliente?->id.' •  '.Str::squish(trim(($pago->cliente?->nombre ?? '').' '.($pago->cliente?->apellido ?? ''))),
-            'Membresia '.Str::lower(Str::squish($pago->membresia?->plan?->nombre ?? '—')),
-            'Desde: '.$pago->membresia?->comienzo?->format('d/m/Y'),
-            'Hasta: '.$pago->membresia?->finalizacion?->format('d/m/Y'),
-            '',
-            'Folio: #'.$pago->id,
-            'Fecha: '.$pago->created_at?->format('d/m/Y H:i'),
-            'Atendió: '.Str::squish($pago->usuario?->name ?? '—'),
-            '',
-
-            ''.match ($pago->metodo_pago) {
-                'cash' => 'En efectivo',
-                'card' => 'Con tarjeta bancaria',
-                'transfer' => 'Con transferencia',
-                default => Str::squish($pago->metodo_pago),
-            },
         ];
+
+        if ($pago->cliente !== null) {
+            $lineas[] = 'Cliente: #'.$pago->cliente->id.' •  '.Str::squish(trim($pago->cliente->nombre.' '.$pago->cliente->apellido));
+        } else {
+            $lineas[] = 'Comprador: '.Str::squish($pago->nombre_comprador ?: 'Venta sin cliente');
+        }
+
+        $lineas[] = 'Membresia '.Str::lower(Str::squish($pago->membresia?->plan?->nombre ?? $pago->plan?->nombre ?? '—'));
+
+        if ($pago->membresia !== null) {
+            $lineas[] = 'Desde: '.$pago->membresia->comienzo?->format('d/m/Y');
+            $lineas[] = 'Hasta: '.$pago->membresia->finalizacion?->format('d/m/Y');
+        }
+
+        $lineas[] = '';
+        $lineas[] = 'Folio: #'.$pago->id;
+        $lineas[] = 'Fecha: '.$pago->created_at?->format('d/m/Y H:i');
+        $lineas[] = 'Atendió: '.Str::squish($pago->usuario?->name ?? '—');
+        $lineas[] = '';
+        $lineas[] = match ($pago->metodo_pago) {
+            'cash' => 'En efectivo',
+            'card' => 'Con tarjeta bancaria',
+            'transfer' => 'Con transferencia',
+            default => Str::squish($pago->metodo_pago),
+        };
 
         if (filled($pago->referencia)) {
             $lineas[] = 'Referencia: '.Str::squish($pago->referencia);

@@ -46,6 +46,7 @@ class MembresiasServicio
             Pago::create([
                 'id_cliente' => $cliente->id,
                 'membresia_id' => $membresiaActual->id,
+                'tipo_membresia_id' => $plan->id,
                 'usuario_id' => $vendedor?->id,
                 'monto' => $plan->precio,
                 'metodo_pago' => $metodoPago,
@@ -99,6 +100,7 @@ class MembresiasServicio
 
             $membresia->pagos()->create([
                 'id_cliente' => $cliente->id,
+                'tipo_membresia_id' => $plan->id,
                 'usuario_id' => $usuario?->id,
                 'monto' => $plan->precio,
                 'metodo_pago' => $metodoPago,
@@ -117,6 +119,40 @@ class MembresiasServicio
             );
 
             return $membresia->load(['cliente', 'plan']);
+        });
+    }
+
+    public function registrarVentaSinCliente(
+        TipoMembresia $plan,
+        string $metodoPago,
+        ?string $nombreComprador = null,
+        ?Usuario $vendedor = null,
+        ?AuditoriaServicio $auditoria = null,
+    ): Pago {
+        if (! $plan->activo) {
+            throw new InvalidArgumentException('El plan de membresía no está activo.');
+        }
+
+        return DB::transaction(function () use ($plan, $metodoPago, $nombreComprador, $vendedor, $auditoria): Pago {
+            $pago = Pago::create([
+                'tipo_membresia_id' => $plan->id,
+                'nombre_comprador' => $nombreComprador,
+                'usuario_id' => $vendedor?->id,
+                'monto' => $plan->precio,
+                'metodo_pago' => $metodoPago,
+            ]);
+
+            ($auditoria ?? app(AuditoriaServicio::class))->registrar(
+                accion: 'membresia.venta_sin_cliente',
+                registro: $pago,
+                metadatos: [
+                    'plan_id' => $plan->id,
+                    'monto' => $plan->precio,
+                ],
+                usuarioId: $vendedor?->id,
+            );
+
+            return $pago->load('plan');
         });
     }
 }

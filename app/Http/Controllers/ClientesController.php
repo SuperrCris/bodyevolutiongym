@@ -61,6 +61,7 @@ class ClientesController extends Controller
             'clienteParaEnrolar' => $clienteParaEnrolar,
             'clienteParaRenovar' => $clienteParaRenovar,
             'planes' => TipoMembresia::query()->where('activo', true)->orderBy('duracion_dias')->get(),
+            'metodosPago' => Pago::METODOS_PAGO,
         ]);
     }
 
@@ -241,7 +242,7 @@ class ClientesController extends Controller
 
     public function receipt(Pago $pago, AjustesTicketServicio $ajustesTicket): View
     {
-        $pago->load(['cliente', 'membresia.plan', 'usuario']);
+        $pago->load(['cliente', 'membresia.plan', 'plan', 'usuario']);
 
         return view('pagos.recibo', [
             'pago' => $pago,

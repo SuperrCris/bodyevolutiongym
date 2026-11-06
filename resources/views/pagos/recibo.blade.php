@@ -123,9 +123,13 @@
 
         <hr class="separador">
 
-        <div class="fila"><span>Cliente</span><span>{{ trim(($pago->cliente?->nombre ?? '').' '.($pago->cliente?->apellido ?? '')) ?: '—' }}</span></div>
-        <div class="fila"><span>Plan</span><span>{{ $pago->membresia?->plan?->nombre ?? '—' }}</span></div>
-        <div class="fila"><span>Vigencia</span><span>{{ $pago->membresia?->comienzo?->format('d/m/Y') ?? '—' }} al {{ $pago->membresia?->finalizacion?->format('d/m/Y') ?? '—' }}</span></div>
+        <div class="fila"><span>{{ $pago->cliente ? 'Cliente' : 'Comprador' }}</span><span>{{ $pago->cliente ? (trim($pago->cliente->nombre.' '.$pago->cliente->apellido) ?: '—') : ($pago->nombre_comprador ?: 'Venta sin cliente') }}</span></div>
+        <div class="fila"><span>Plan</span><span>{{ $pago->membresia?->plan?->nombre ?? $pago->plan?->nombre ?? '—' }}</span></div>
+        @if ($pago->membresia)
+            <div class="fila"><span>Vigencia</span><span>{{ $pago->membresia->comienzo?->format('d/m/Y') ?? '—' }} al {{ $pago->membresia->finalizacion?->format('d/m/Y') ?? '—' }}</span></div>
+        @else
+            <div class="fila"><span>Vigencia</span><span>No asignada</span></div>
+        @endif
 
         <hr class="separador">
 

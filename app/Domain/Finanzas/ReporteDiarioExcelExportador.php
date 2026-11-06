@@ -212,8 +212,10 @@ class ReporteDiarioExcelExportador
 
                 if ($hayMembresias) {
                     $membresia = $iteradorMembresias->current();
-                    $fila[0] = (int) $membresia->cliente_id;
-                    $fila[1] = trim($membresia->cliente_nombre.' '.$membresia->cliente_apellido);
+                    $fila[0] = $membresia->cliente_id === null ? '—' : (int) $membresia->cliente_id;
+                    $fila[1] = $membresia->cliente_id === null
+                        ? (trim((string) $membresia->nombre_comprador) ?: 'Venta sin cliente')
+                        : trim($membresia->cliente_nombre.' '.$membresia->cliente_apellido);
                     $fila[2] = CarbonImmutable::parse($membresia->fecha)->format('d/m/Y H:i');
                     $fila[3] = $this->nombreMetodo($membresia->metodo_pago);
                     $fila[4] = (float) $membresia->monto;

@@ -10,7 +10,7 @@
 
         </div>
         <div class="flex flex-wrap gap-3">
-          <button type="button" data-verificar-huella class="rounded-2xl border border-teal-300/40 px-5 py-3 font-bold text-teal-200 transition hover:border-teal-200 hover:text-teal-100">Verificar huella</button>
+            <button type="button" data-open-modal="registrarVenta" class="rounded-2xl border border-white/10 px-5 py-3 font-bold text-slate-200 transition hover:border-teal-300/50 hover:text-teal-200">Vender membresía</button>
             <button type="button" data-open-modal="crearCliente" class="rounded-2xl bg-teal-300 px-5 py-3 font-bold text-slate-950 shadow-lg shadow-teal-950/20 transition hover:bg-teal-200">+ Nuevo cliente</button>
         </div>
     </div>
@@ -160,6 +160,66 @@
             <div class="flex items-center justify-between"><h2 class="text-xl font-bold">Nuevo cliente</h2><button type="button" data-close-modal class="text-2xl text-slate-500 hover:text-white">×</button></div>
             @include('clientes.partials.formulario', ['action' => route('clientes.store'), 'method' => 'POST', 'cliente' => null])
         @endif
+    </div>
+</div>
+
+<div id="registrarVenta" data-modal class="modal-backdrop z-50 {{ old('abrir_modal_venta') ? 'flex' : 'hidden' }} bg-slate-950/80">
+    <div class="modal-panel max-h-[calc(100vh-3rem)] w-full max-w-lg overflow-y-auto">
+        <div class="flex items-center justify-between gap-4">
+            <div>
+                <h2 class="text-xl font-bold">Vender membresía</h2>
+            </div>
+            <button type="button" data-close-modal class="text-2xl text-slate-500 hover:text-white" aria-label="Cerrar">×</button>
+        </div>
+        <form method="POST" action="{{ route('ventas.store') }}" class="mt-6 space-y-4">
+            @csrf
+            <input type="hidden" name="abrir_modal_venta" value="1">
+            <label class="block">
+                <span class="field-label">Plan</span>
+                <select name="tipo_membresia_id" required class="field-control">
+                    <option value="">Selecciona un plan</option>
+                    @foreach ($planes as $plan)
+                        <option value="{{ $plan->id }}" @selected(old('tipo_membresia_id', $planes->first()?->id) == $plan->id)>
+                            {{ $plan->nombre }} · {{ $plan->duracion_dias }} {{ $plan->duracion_dias === 1 ? 'día' : 'días' }} · ${{ number_format((float) $plan->precio, 2) }}
+                        </option>
+                    @endforeach
+                </select>
+            </label>
+            <label class="block">
+                <span class="field-label">Nombre</span>
+                <input name="nombre_comprador" value="{{ old('nombre_comprador') }}" maxlength="255" class="field-control" autocomplete="name">
+            </label>
+            <label class="block">
+                <span class="field-label">Método de pago</span>
+                <select name="metodo_pago" required class="field-control">
+                    @foreach ($metodosPago as $valor => $nombre)
+                        <option value="{{ $valor }}" @selected(old('metodo_pago', 'efectivo') === $valor)>{{ $nombre }}</option>
+                    @endforeach
+                </select>
+            </label>
+            <fieldset class="space-y-2">
+                <legend class="field-label">Impresión del recibo</legend>
+                <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
+                    <input type="radio" name="imprimir" value="dos" @checked(old('imprimir', 'dos') === 'dos') class="mt-0.5 h-4 w-4 border-white/20 bg-slate-950 text-teal-300 focus:ring-teal-300/60">
+                    <span>
+                        <span class="block text-sm font-semibold text-slate-200">Imprimir tickets</span>
+                        <span class="block text-xs text-slate-400">Imprime dos copias.</span>
+                    </span>
+                </label>
+                <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
+                    <input type="radio" name="imprimir" value="uno" @checked(old('imprimir') === 'uno') class="mt-0.5 h-4 w-4 border-white/20 bg-slate-950 text-teal-300 focus:ring-teal-300/60">
+                    <span class="text-sm font-semibold text-slate-200">Imprimir un solo ticket</span>
+                </label>
+                <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
+                    <input type="radio" name="imprimir" value="no" @checked(old('imprimir') === 'no') class="mt-0.5 h-4 w-4 border-white/20 bg-slate-950 text-teal-300 focus:ring-teal-300/60">
+                    <span class="text-sm font-semibold text-slate-200">No imprimir ticket</span>
+                </label>
+            </fieldset>
+            <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button type="button" data-close-modal class="rounded-xl border border-white/10 px-4 py-3 text-sm font-semibold text-slate-300 transition hover:border-white/30">Cancelar</button>
+                <button class="button-primary px-5 py-3">Registrar venta</button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -341,13 +401,6 @@
         }, 'image/jpeg', 0.9);
     });
     setTimeout(() => document.querySelector('[data-toast]')?.remove(), 5000);
-    async function actualizarResumen() {
-        const response = await fetch('{{ route('clientes.resumen') }}', { headers: { 'Accept': 'application/json' } });
-        if (!response.ok) return;
-        const data = await response.json();
-        document.getElementById('totalClientes').textContent = data.clientes;
-        document.getElementById('membresiasActivas').textContent = data.membresias_activas;
-    }
     async function solicitarHuella(url, options = {}) {
         const response = await fetch(url, {
             ...options,
@@ -461,7 +514,5 @@
             button.textContent = 'Verificar huella';
         }
     });
-    actualizarResumen();
-    setInterval(actualizarResumen, 15000);
 </script>
 @endpush

@@ -37,7 +37,10 @@ class ReporteFinancieroServicio
         $membresiasPorMetodo = array_fill_keys(array_keys(self::METODOS_PAGO), 0);
 
         $pagos = DB::table('pagos')
-            ->whereNotNull('membresia_id')
+            ->where(function (Builder $query): void {
+                $query->whereNotNull('membresia_id')
+                    ->orWhereNotNull('tipo_membresia_id');
+            })
             ->whereBetween('created_at', [$desde, $hasta])
             ->select('metodo_pago')
             ->selectRaw('SUM(monto) AS total')
@@ -232,14 +235,15 @@ class ReporteFinancieroServicio
     {
         $ingresos = DB::table('pagos')
             ->leftJoin('membresias', 'membresias.id', '=', 'pagos.membresia_id')
-            ->leftJoin('tipo_membresias', 'tipo_membresias.id', '=', 'membresias.tipo_membresia_id')
+            ->leftJoin('tipo_membresias as plan_membresia', 'plan_membresia.id', '=', 'membresias.tipo_membresia_id')
+            ->leftJoin('tipo_membresias as plan_pago', 'plan_pago.id', '=', 'pagos.tipo_membresia_id')
             ->whereBetween('pagos.created_at', [$desde, $hasta])
             ->selectRaw('? AS tipo_movimiento', ['ingreso'])
             ->selectRaw(
-                'CASE WHEN pagos.membresia_id IS NULL THEN ? ELSE ? END AS categoria',
+                'CASE WHEN pagos.membresia_id IS NULL AND pagos.tipo_membresia_id IS NULL THEN ? ELSE ? END AS categoria',
                 ['Otros ingresos', 'Membresías'],
             )
-            ->selectRaw('COALESCE(tipo_membresias.nombre, ?) AS concepto', ['Ingreso adicional'])
+            ->selectRaw('COALESCE(plan_membresia.nombre, plan_pago.nombre, ?) AS concepto', ['Ingreso adicional'])
             ->addSelect('pagos.created_at AS fecha', 'pagos.metodo_pago')
             ->selectRaw('pagos.monto AS ingreso, 0 AS egreso, pagos.id AS id');
 
@@ -270,9 +274,13 @@ class ReporteFinancieroServicio
     {
         return DB::table('pagos')
             ->leftJoin('membresias', 'membresias.id', '=', 'pagos.membresia_id')
-            ->leftJoin('tipo_membresias', 'tipo_membresias.id', '=', 'membresias.tipo_membresia_id')
+            ->leftJoin('tipo_membresias as plan_membresia', 'plan_membresia.id', '=', 'membresias.tipo_membresia_id')
+            ->leftJoin('tipo_membresias as plan_pago', 'plan_pago.id', '=', 'pagos.tipo_membresia_id')
             ->leftJoin('clientes', 'clientes.id', '=', 'pagos.id_cliente')
-            ->whereNotNull('pagos.membresia_id')
+            ->where(function (Builder $query): void {
+                $query->whereNotNull('pagos.membresia_id')
+                    ->orWhereNotNull('pagos.tipo_membresia_id');
+            })
             ->whereBetween('pagos.created_at', [$desde, $hasta])
             ->when($clienteId !== null, fn (Builder $query) => $query->where('pagos.id_cliente', $clienteId))
             ->addSelect(
@@ -281,8 +289,9 @@ class ReporteFinancieroServicio
                 'clientes.apellido AS cliente_apellido',
                 'pagos.created_at AS fecha',
                 'pagos.monto',
-                'tipo_membresias.nombre AS tipo_membresia',
+                'pagos.nombre_comprador',
             )
+            ->selectRaw('COALESCE(plan_membresia.nombre, plan_pago.nombre) AS tipo_membresia')
             ->selectRaw(
                 "CASE pagos.metodo_pago WHEN 'cash' THEN 'efectivo' WHEN 'card' THEN 'tarjeta' WHEN 'transfer' THEN 'transferencia' ELSE pagos.metodo_pago END AS metodo_pago",
             )

@@ -43,6 +43,22 @@ Antes de ejecutarlo, revisa en `.env` `DB_CONNECTION`, `DB_HOST`, `DB_PORT`, `DB
 
 El usuario inicial creado por el seeder es `cristian` con contraseña `password`. Cambia esa contraseña después del primer inicio de sesión.
 
+## Iniciar todos los servicios con Windows
+
+Después de inicializar la base de datos, registra el script como una tarea programada de Windows ejecutando PowerShell como administrador desde la raíz del proyecto:
+
+```powershell
+.\iniciar-local.ps1 -ConfigurarInicio
+```
+
+La tarea `BodyEvolutionGym - Iniciar servicios` se ejecutará al iniciar sesión y levantará SQL Server, el puente biométrico y Laravel en segundo plano. Cuando Laravel responda, abrirá Google Chrome en `http://127.0.0.1:8000`. Laravel se sirve mediante el servidor PHP integrado y `server-router.php`, evitando el supervisor interno de `artisan serve` que puede fallar al interpretar la salida del proceso en Windows. El script supervisa Laravel y lo intenta reiniciar cinco segundos después si el proceso termina con error. El registro es idempotente: volver a ejecutar el comando actualiza la tarea existente sin duplicarla.
+
+Para quitar el inicio automático:
+
+```powershell
+.\iniciar-local.ps1 -EliminarInicio
+```
+
 ## Agentic Development
 
 Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
