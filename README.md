@@ -1,88 +1,134 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Body Evolution Gym
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Aplicación web para la operación diaria de un gimnasio: clientes, membresías, pagos, ventas, egresos, reportes y control de acceso biométrico. Está construida con Laravel y ofrece un puente local Java para lectores DigitalPersona e impresión de recibos en Windows.
 
-## About Laravel
+## Contenido
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- [Requisitos](#requisitos)
+- [Instalación](#instalación)
+- [Inicio local en Windows](#inicio-local-en-windows)
+- [Funciones y permisos](#funciones-y-permisos)
+- [Arquitectura del proyecto](#arquitectura-del-proyecto)
+- [Configuración](#configuración)
+- [Pruebas](#pruebas)
+- [Solución de problemas](#solución-de-problemas)
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Requisitos
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- Windows para los scripts de inicio y la integración con dispositivos.
+- PHP 8.4 o superior y Composer.
+- Node.js y npm para compilar los recursos de Vite.
+- PostgreSQL, que es el motor configurado en `.env.example`. `config/database.php` también define conexiones para SQLite, MySQL, MariaDB y SQL Server; configura el motor y sus credenciales en `.env`.
+- Para huellas e impresión: JDK 21, los controladores y el SDK Java de DigitalPersona instalados en `C:\Program Files\DigitalPersona\Bin\Java`, lector compatible y, para recibos, una impresora predeterminada configurada en Windows.
 
-## Learning Laravel
+## Instalación
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+1. Clona el repositorio y abre PowerShell en su raíz.
+2. Crea la base de datos configurada en `.env`. Para PostgreSQL se incluye [database/postgresql/create_database.sql](database/postgresql/create_database.sql); ejecútalo conectado a una base administrativa con permiso para crear bases de datos.
+3. Revisa las variables `DB_CONNECTION`, `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME` y `DB_PASSWORD` en `.env.example` y ajusta `.env` a tu entorno. Si `.env` aún no existe, el inicializador lo crea a partir de `.env.example`.
+4. Inicializa Laravel y la base de datos:
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+   ```powershell
+   .\inicializar-base.ps1
+   ```
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+   El script instala dependencias PHP si falta `vendor`, genera `APP_KEY` si está vacía y ejecuta migraciones y seeders. No crea la base de datos ni elimina o reinicia tablas existentes. Usa `-OmitirDependencias` solo si las dependencias PHP ya están instaladas.
 
-## Inicializar una máquina nueva
+5. Instala y compila los recursos del frontend:
 
-Después de clonar el proyecto y configurar PostgreSQL, ejecuta PowerShell desde la raíz del proyecto:
+   ```powershell
+   npm ci
+   npm run build
+   ```
+
+El seeder crea el usuario inicial `cristian` con contraseña `password`, además del plan “Plan mensual”. Cambia la contraseña del usuario inicial tras el primer acceso y no compartas credenciales reales ni el archivo `.env`.
+
+## Inicio local en Windows
+
+Para iniciar el stack local integrado, ejecuta desde PowerShell:
 
 ```powershell
-.\inicializar-base.ps1
+.\iniciar-local.ps1
 ```
 
-El script crea `.env` si no existe, genera `APP_KEY` únicamente cuando está vacío, instala las dependencias PHP si `vendor` aún no existe y ejecuta las migraciones junto con los datos iniciales. No elimina ni reinicia tablas existentes.
+El script solicita elevación de permisos, inicia o reinicia el servicio SQL Server Express `MSSQL$SQLEXPRESS` si está instalado, compila y levanta el puente biométrico, comprueba la conexión configurada en `.env` y sirve Laravel en `http://127.0.0.1:8000`. Si encuentra Google Chrome, abre la aplicación. Laravel se ejecuta en primer plano; usa `Ctrl+C` para detenerlo. Si el servidor termina con error, el script intenta iniciarlo de nuevo.
 
-Antes de ejecutarlo, revisa en `.env` `DB_CONNECTION`, `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME` y `DB_PASSWORD` para que correspondan a la base de datos de la máquina.
+La conexión efectiva a la base de datos depende de `DB_CONNECTION` y las demás variables `DB_*` de `.env`; el servicio SQL Server Express que administra el script no cambia esa configuración.
 
-El usuario inicial creado por el seeder es `cristian` con contraseña `password`. Cambia esa contraseña después del primer inicio de sesión.
-
-## Iniciar todos los servicios con Windows
-
-Después de inicializar la base de datos, registra el script como una tarea programada de Windows ejecutando PowerShell como administrador desde la raíz del proyecto:
+Para iniciar el stack automáticamente al iniciar sesión en Windows, ejecuta PowerShell como administrador:
 
 ```powershell
 .\iniciar-local.ps1 -ConfigurarInicio
 ```
 
-La tarea `BodyEvolutionGym - Iniciar servicios` se ejecutará al iniciar sesión y levantará SQL Server, el puente biométrico y Laravel en segundo plano. Cuando Laravel responda, abrirá Google Chrome en `http://127.0.0.1:8000`. Laravel se sirve mediante el servidor PHP integrado y `server-router.php`, evitando el supervisor interno de `artisan serve` que puede fallar al interpretar la salida del proceso en Windows. El script supervisa Laravel y lo intenta reiniciar cinco segundos después si el proceso termina con error. El registro es idempotente: volver a ejecutar el comando actualiza la tarea existente sin duplicarla.
-
-Para quitar el inicio automático:
+Para quitar la tarea programada:
 
 ```powershell
 .\iniciar-local.ps1 -EliminarInicio
 ```
 
-## Agentic Development
+El servidor web también puede ejecutarse por separado con `php artisan serve`. En ese modo, las funciones biométricas y de impresión requieren que el puente local esté iniciado. Consulta la guía de [biometria-java](biometria-java/README.md) para compilarlo, ejecutarlo y comprobar su estado.
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+## Funciones y permisos
 
-```bash
-composer require laravel/boost --dev
+Las rutas web están definidas en [routes/web.php](routes/web.php) y requieren autenticación, salvo el acceso y la autenticación biométrica desde la pantalla de inicio de sesión.
 
-php artisan boost:install
+| Área | Funciones |
+| --- | --- |
+| Clientes | Alta, edición, consulta de documentos y resumen; renovación de membresías y recibos. |
+| Finanzas | Registro de ventas y egresos; reportes con exportación CSV y Excel. |
+| Membresías | Administración de tipos de plan y actualización de vigencias. |
+| Empleados | Administración de empleados y enrolamiento biométrico. |
+| Registros | Consulta de registros de acceso. |
+| Ajustes | Preferencias de notificaciones y configuración del ticket. |
+| Biometría | Inicio de sesión, enrolamiento y verificación de huellas mediante el puente local. |
+
+El rol `recepcionista` tiene acceso a clientes, renovaciones, recibos, ventas, egresos y reportes. El rol `administrador` tiene acceso a administración de tipos de membresía, empleados, registros, vigencias y configuración del ticket. Los ajustes generales y las preferencias de notificación requieren autenticación. La API de [routes/api.php](routes/api.php) expone operaciones versionadas bajo `/api/v1` y también está protegida por autenticación y roles.
+
+## Arquitectura del proyecto
+
+- `app/Http/Controllers/`: controladores web y API.
+- `app/Domain/`: servicios de dominio para ajustes, auditoría, biometría, finanzas, impresión y membresías.
+- `app/Modelos/`: modelos Eloquent; el espacio de nombres `App\Models` se asigna a esta carpeta mediante Composer.
+- `routes/`: rutas web, API y de consola.
+- `resources/views/`: vistas Blade; `resources/css/` y `resources/js/` contienen los recursos compilados con Vite.
+- `database/migrations/`, `database/seeders/` y `database/factories/`: esquema, datos iniciales y datos de prueba.
+- `biometria-java/`: proceso local Java para el lector DigitalPersona y la impresión.
+- `tests/Feature/` y `tests/Unit/`: pruebas Pest.
+
+## Configuración
+
+Además de las variables de aplicación y base de datos, el puente biométrico se configura en `.env`:
+
+| Variable | Valor predeterminado | Uso |
+| --- | --- | --- |
+| `BIOMETRIA_URL` | `http://127.0.0.1:8765` | Dirección local del puente Java. |
+| `BIOMETRIA_TERMINAL` | vacío | Identificador opcional de terminal. |
+| `BIOMETRIA_CONNECT_TIMEOUT` | `2` | Tiempo límite de conexión en segundos. |
+| `BIOMETRIA_TIMEOUT` | `45` | Tiempo límite general de las solicitudes biométricas. |
+| `BIOMETRIA_PRINT_TIMEOUT` | `15` | Tiempo límite de impresión. |
+| `BIOMETRIA_ENROLL_TIMEOUT` | `200` | Tiempo límite de enrolamiento. |
+| `BIOMETRIA_LOTE_IDENTIFICACION` | `250` | Plantillas por lote durante la identificación. |
+
+Los valores biométricos se definen en [config/biometria.php](config/biometria.php). No guardes secretos ni credenciales de producción en el repositorio.
+
+## Pruebas
+
+Ejecuta todas las pruebas con:
+
+```powershell
+php artisan test --compact
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Para ejecutar un archivo específico, pásalo al comando, por ejemplo:
 
-## Contributing
+```powershell
+php artisan test --compact tests/Feature/GestionClientesTest.php
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Solución de problemas
 
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+- **No conecta con la base de datos:** confirma que la base exista, que el servicio esté iniciado y que las variables `DB_*` de `.env` sean correctas. Para PostgreSQL, revisa también el puerto y que la extensión `pdo_pgsql` esté disponible.
+- **El puente no responde en `127.0.0.1:8765`:** comprueba que JDK 21, los controladores DigitalPersona y sus JAR estén instalados; ejecuta `.\biometria-java\ejecutar.ps1` y consulta la guía del puente.
+- **No compila el frontend:** ejecuta `npm ci` y luego `npm run build`.
+- **El login inicial no funciona:** las credenciales de ejemplo solo aplican después de ejecutar los seeders y mientras no se hayan cambiado. No ejecutes `db:seed` como método de recuperación: puede volver a escribir los valores iniciales del usuario. No uses esas credenciales en producción.
