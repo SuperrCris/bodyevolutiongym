@@ -126,6 +126,19 @@ Para ejecutar un archivo específico, pásalo al comando, por ejemplo:
 php artisan test --compact tests/Feature/GestionClientesTest.php
 ```
 
+## CI/CD
+
+El workflow de GitHub Actions ejecuta las pruebas Pest y compila Vite en cada pull request hacia `main` y en cada push a `main`. Tras pasar esas comprobaciones, los pushes a `main` se despliegan automáticamente en el sistema Windows local mediante un runner self-hosted con la etiqueta adicional `production`.
+
+Para habilitar el despliegue:
+
+1. En GitHub, agrega un runner self-hosted Windows x64 al repositorio y asígnale la etiqueta `production`. Instálalo como servicio con una cuenta que pueda ejecutar PHP, Composer, Node.js/npm y acceder al directorio de producción.
+2. En **Settings > Secrets and variables > Actions > Variables**, crea `PRODUCTION_PATH` con la ruta absoluta de la instalación existente de Laravel en ese equipo.
+3. Confirma que el directorio de producción ya contiene `.env`, `artisan` y `storage`, y que la cuenta del runner puede escribir en él. El despliegue conserva `.env`, `storage`, `public/storage` y cualquier `database.sqlite` local; ejecuta las migraciones y optimiza Laravel. Si falla, el script intenta desactivar el modo de mantenimiento.
+4. Protege la rama `main` para exigir que las comprobaciones del workflow pasen antes de integrar cambios. El runner de producción solo participa en pushes a `main`, nunca en pull requests.
+
+El runner necesita acceso a GitHub y a los comandos `php`, `composer`, `node`, `npm` y `robocopy`. No guardes `.env` ni credenciales de producción en el repositorio.
+
 ## Solución de problemas
 
 - **No conecta con la base de datos:** confirma que la base exista, que el servicio esté iniciado y que las variables `DB_*` de `.env` sean correctas. Para PostgreSQL, revisa también el puerto y que la extensión `pdo_pgsql` esté disponible.
