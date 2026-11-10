@@ -61,6 +61,8 @@ jobs:
       - windows
       - x64
       - production
+    env:
+      PHP_EXECUTABLE: 'C:\Users\HP\.local\php\8.5.12\php.exe'
     environment:
       name: production
     steps:
@@ -73,7 +75,7 @@ jobs:
           $toolProfile = 'C:\Users\HP'
           $phpDirectory = Join-Path $toolProfile '.local\php\8.5.12'
           $composerDirectory = Join-Path $toolProfile '.config\herd-lite\bin'
-          $phpExecutable = Join-Path $phpDirectory 'php.exe'
+          $phpExecutable = $env:PHP_EXECUTABLE
           $composerExecutable = Join-Path $composerDirectory 'composer.bat'
 
           if (-not (Test-Path -LiteralPath $phpExecutable -PathType Leaf)) {
@@ -122,7 +124,7 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($env:PRODUCTION_PATH)) {
             throw 'Set the PRODUCTION_PATH Actions variable to the existing Laravel installation directory.'
           }
-          .\.github\scripts\deploy-production.ps1 -DeployPath $env:PRODUCTION_PATH
+          .\.github\scripts\deploy-production.ps1 -DeployPath $env:PRODUCTION_PATH -PhpExecutable $env:PHP_EXECUTABLE
         shell: powershell
         env:
           PRODUCTION_PATH: ${{ vars.PRODUCTION_PATH }}

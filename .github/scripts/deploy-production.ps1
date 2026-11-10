@@ -1,7 +1,11 @@
 param (
     [Parameter(Mandatory = $true)]
     [ValidateNotNullOrEmpty()]
-    [string] $DeployPath
+    [string] $DeployPath,
+
+    [Parameter(Mandatory = $true)]
+    [ValidateNotNullOrEmpty()]
+    [string] $PhpExecutable
 )
 
 $ErrorActionPreference = 'Stop'
@@ -13,9 +17,14 @@ if ([string]::IsNullOrWhiteSpace($env:GITHUB_WORKSPACE)) {
 
 $sourcePath = [System.IO.Path]::GetFullPath($env:GITHUB_WORKSPACE)
 $DeployPath = [System.IO.Path]::GetFullPath($DeployPath)
+$PhpExecutable = [System.IO.Path]::GetFullPath($PhpExecutable)
 
 if (-not (Test-Path -LiteralPath $sourcePath -PathType Container)) {
     throw "Source directory does not exist: $sourcePath"
+}
+
+if (-not (Test-Path -LiteralPath $PhpExecutable -PathType Leaf)) {
+    throw "PHP executable does not exist: $PhpExecutable"
 }
 
 if (-not (Test-Path -LiteralPath $DeployPath -PathType Container)) {
@@ -71,7 +80,7 @@ try {
     $maintenanceEnabled = $false
 
     try {
-        Invoke-CheckedCommand -FilePath 'php' -Arguments @('artisan', 'down')
+        Invoke-CheckedCommand -FilePath $PhpExecutable -Arguments @('artisan', 'down')
         $maintenanceEnabled = $true
 
         $excludedDirectories = @(
@@ -98,12 +107,12 @@ try {
             throw "robocopy.exe failed with exit code $LASTEXITCODE."
         }
 
-        Invoke-CheckedCommand -FilePath 'php' -Arguments @('artisan', 'migrate', '--force')
-        Invoke-CheckedCommand -FilePath 'php' -Arguments @('artisan', 'optimize')
+        Invoke-CheckedCommand -FilePath $PhpExecutable -Arguments @('artisan', 'migrate', '--force')
+        Invoke-CheckedCommand -FilePath $PhpExecutable -Arguments @('artisan', 'optimize')
     }
     finally {
         if ($maintenanceEnabled) {
-            Invoke-CheckedCommand -FilePath 'php' -Arguments @('artisan', 'up')
+            Invoke-CheckedCommand -FilePath $PhpExecutable -Arguments @('artisan', 'up')
         }
     }
 }
