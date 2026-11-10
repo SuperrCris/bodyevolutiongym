@@ -132,12 +132,12 @@ El workflow de GitHub Actions ejecuta las pruebas Pest y compila Vite en cada pu
 
 Para habilitar el despliegue:
 
-1. En GitHub, agrega un runner self-hosted Windows x64 al repositorio y asígnale la etiqueta `production`. Instálalo como servicio con una cuenta que pueda ejecutar PHP, Composer, Node.js/npm y acceder al directorio de producción.
+1. En GitHub, agrega un runner self-hosted Windows x64 al repositorio y asígnale la etiqueta `production`. Instálalo como servicio con una cuenta que pueda acceder a PHP 8.5, Composer y al directorio de producción.
 2. En **Settings > Secrets and variables > Actions > Variables**, crea `PRODUCTION_PATH` con la ruta absoluta de la instalación existente de Laravel en ese equipo.
 3. Confirma que el directorio de producción ya contiene `.env`, `artisan` y `storage`, y que la cuenta del runner puede escribir en él. El despliegue conserva `.env`, `storage`, `public/storage` y cualquier `database.sqlite` local; ejecuta las migraciones y optimiza Laravel. Si falla, el script intenta desactivar el modo de mantenimiento.
 4. Protege la rama `main` para exigir que las comprobaciones del workflow pasen antes de integrar cambios. El runner de producción solo participa en pushes a `main`, nunca en pull requests.
 
-El runner necesita acceso a GitHub, acceso a la base de datos de producción y `robocopy`; el workflow prepara PHP 8.5, Composer y Node.js 22 en cada ejecución. No guardes `.env` ni credenciales de producción en el repositorio.
+El runner necesita acceso a GitHub, a la base de datos de producción y a `robocopy`. En el equipo Windows, el workflow usa PHP 8.5 instalado en `%USERPROFILE%\.local\php\8.5.12` con `pdo_pgsql` habilitado y Composer en `%USERPROFILE%\.config\herd-lite\bin`; agrega esas rutas al `PATH` del job. También prepara Node.js 22 en cada ejecución. Si PHP o Composer están instalados en otras rutas, ajusta el paso `Configure PHP and Composer` del workflow. No guardes `.env` ni credenciales de producción en el repositorio.
 
 ## Solución de problemas
 

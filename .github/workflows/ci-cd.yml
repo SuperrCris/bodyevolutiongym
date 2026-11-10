@@ -67,13 +67,39 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Set up PHP and Composer
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.5'
-          extensions: pdo_pgsql
-          tools: composer:v2
-          coverage: none
+      - name: Configure PHP and Composer
+        shell: powershell
+        run: |
+          $phpDirectory = Join-Path $env:USERPROFILE '.local\php\8.5.12'
+          $composerDirectory = Join-Path $env:USERPROFILE '.config\herd-lite\bin'
+          $phpExecutable = Join-Path $phpDirectory 'php.exe'
+          $composerExecutable = Join-Path $composerDirectory 'composer.bat'
+
+          if (-not (Test-Path -LiteralPath $phpExecutable -PathType Leaf)) {
+            throw "PHP 8.5 was not found at $phpExecutable."
+          }
+          if (-not (Test-Path -LiteralPath $composerExecutable -PathType Leaf)) {
+            throw "Composer was not found at $composerExecutable."
+          }
+
+          $env:PATH = "$phpDirectory;$composerDirectory;$env:PATH"
+          $phpVersion = & $phpExecutable -r 'echo PHP_MAJOR_VERSION . chr(46) . PHP_MINOR_VERSION;'
+          if ($LASTEXITCODE -ne 0 -or $phpVersion -ne '8.5') {
+            throw "PHP 8.5 is required; found version $phpVersion."
+          }
+
+          $phpModules = & $phpExecutable -m
+          if ($LASTEXITCODE -ne 0 -or $phpModules -notcontains 'pdo_pgsql') {
+            throw 'The pdo_pgsql PHP extension is required for production migrations.'
+          }
+
+          & $composerExecutable --version
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Composer could not be started.'
+          }
+
+          $pathEntries = "$phpDirectory`n$composerDirectory`n"
+          [System.IO.File]::AppendAllText($env:GITHUB_PATH, $pathEntries, [System.Text.UTF8Encoding]::new($false))
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
