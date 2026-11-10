@@ -70,8 +70,9 @@ jobs:
       - name: Configure PHP and Composer
         shell: powershell
         run: |
-          $phpDirectory = Join-Path $env:USERPROFILE '.local\php\8.5.12'
-          $composerDirectory = Join-Path $env:USERPROFILE '.config\herd-lite\bin'
+          $toolProfile = 'C:\Users\HP'
+          $phpDirectory = Join-Path $toolProfile '.local\php\8.5.12'
+          $composerDirectory = Join-Path $toolProfile '.config\herd-lite\bin'
           $phpExecutable = Join-Path $phpDirectory 'php.exe'
           $composerExecutable = Join-Path $composerDirectory 'composer.bat'
 
