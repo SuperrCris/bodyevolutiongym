@@ -137,7 +137,7 @@ Para habilitar el despliegue:
 3. Confirma que el directorio de producción ya contiene `.env`, `artisan` y `storage`, y que la cuenta del runner puede escribir en él. El despliegue conserva `.env`, `storage`, `public/storage` y cualquier `database.sqlite` local; ejecuta las migraciones y optimiza Laravel. Si falla, el script intenta desactivar el modo de mantenimiento.
 4. Protege la rama `main` para exigir que las comprobaciones del workflow pasen antes de integrar cambios. El runner de producción solo participa en pushes a `main`, nunca en pull requests.
 
-El runner necesita acceso a GitHub y a los comandos `php`, `composer`, `node`, `npm` y `robocopy`. No guardes `.env` ni credenciales de producción en el repositorio.
+El runner necesita acceso a GitHub, acceso a la base de datos de producción y `robocopy`; el workflow prepara PHP 8.5, Composer y Node.js 22 en cada ejecución. No guardes `.env` ni credenciales de producción en el repositorio.
 
 ## Solución de problemas
 
