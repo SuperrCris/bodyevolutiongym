@@ -31,8 +31,6 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/clientes', [ClientesController::class, 'index'])->name('clientes.index');
         Route::post('/clientes', [ClientesController::class, 'store'])->name('clientes.store');
         Route::put('/clientes/{cliente}', [ClientesController::class, 'update'])->name('clientes.update');
-        Route::get('/clientes/{cliente}/documento', [ClientesController::class, 'mostrarDocumento'])
-            ->name('clientes.documento');
         Route::post('/clientes/{cliente}/renovar', [ClientesController::class, 'renovar'])->name('clientes.renovar');
         Route::get('/pagos/{pago}/recibo', [ClientesController::class, 'receipt'])->name('pagos.recibo');
         Route::post('/pagos/{pago}/imprimir', [ClientesController::class, 'printReceipt'])->name('pagos.imprimir');
@@ -53,6 +51,8 @@ Route::middleware('auth')->group(function (): void {
     Route::middleware('rol:administrador')->group(function (): void {
         Route::put('/ajustes/ticket', [AjustesController::class, 'actualizarTicket'])
             ->name('ajustes.ticket.update');
+        Route::put('/membresias/{membresia}', [ClientesController::class, 'actualizarMembresia'])
+            ->name('membresias.update');
         Route::put('/membresias/{membresia}/vigencia', [ClientesController::class, 'actualizarVigencia'])
             ->name('membresias.vigencia.update');
         Route::get('/tipos-de-membresia', [TiposMembresiaController::class, 'index'])->name('tipos-membresia.index');

@@ -100,7 +100,7 @@
                     <p class="mt-1 text-sm font-semibold group-data-[view-mode=lista]:mt-0.5 group-data-[view-mode=lista]:text-xs">{{ $membresia?->finalizacion?->format('d/m/Y') ?: '—' }}</p>
                     </div>
                     @if ($membresia && auth()->user()->esAdministrador())
-                        @include('clientes.partials.vigencia', ['membresia' => $membresia])
+                        @include('clientes.partials.editar-membresia', ['membresia' => $membresia])
                     @endif
                     <div class="col-span-2 flex items-center gap-2 border-t border-white/10 pt-3 group-data-[view-mode=lista]:border-t-0 group-data-[view-mode=lista]:pt-0">
                         <span data-huella-indicador="{{ $cliente->id }}" class="relative grid size-6 shrink-0 place-items-center group-data-[view-mode=lista]:size-5">
@@ -364,7 +364,7 @@
 
         try {
             cameraStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: cameraTarget === 'documento' ? 'environment' : 'user' },
+                video: { facingMode: 'user' },
                 audio: false,
             });
             cameraVideo.srcObject = cameraStream;

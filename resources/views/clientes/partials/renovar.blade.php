@@ -1,10 +1,32 @@
 <div id="renovar-{{ $cliente->id }}" data-modal class="modal-backdrop z-50 hidden bg-slate-950/80">
     <div class="modal-panel max-h-[calc(100vh-3rem)] w-full max-w-lg overflow-y-auto">
         <div class="flex items-center justify-between"><h2 class="text-xl font-bold">Renovar membresía</h2><button type="button" data-close-modal class="text-2xl text-slate-500 hover:text-white">×</button></div>
-        @if ($cliente->foto_documento)
+        @if ($cliente->institucion_documento || $cliente->vigencia_documento || $cliente->detalles_documento)
             <div class="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                <p class="mb-2 text-sm font-semibold text-slate-300">Documento del cliente</p>
-                <img src="{{ route('clientes.documento', $cliente) }}" alt="Documento de {{ $cliente->nombre }} {{ $cliente->apellido }}" class="mx-auto max-h-52 max-w-full rounded-lg object-contain">
+                <p class="mb-2 text-sm font-semibold text-slate-300">Datos de promoción institucional</p>
+                <dl class="space-y-2 text-sm">
+                    @if ($cliente->institucion_documento)
+                        <div>
+                            <dt class="text-xs text-slate-400">Institución</dt>
+                            <dd class="font-medium text-slate-200">{{ $cliente->institucion_documento }}</dd>
+                        </div>
+                    @endif
+                    @if ($cliente->vigencia_documento)
+                        <div>
+                            <dt class="text-xs text-slate-400">Vigencia</dt>
+                            <dd class="font-medium text-slate-200">{{ $cliente->vigencia_documento->format('d/m/Y') }}</dd>
+                        </div>
+                    @endif
+                    @if ($cliente->detalles_documento)
+                        <div>
+                            <dt class="text-xs text-slate-400">Detalles</dt>
+                            <dd class="whitespace-pre-line font-medium text-slate-200">{{ $cliente->detalles_documento }}</dd>
+                        </div>
+                    @endif
+                </dl>
+                @if ($cliente->vigencia_documento?->isBefore(today()))
+                    <p role="alert" class="mt-3 rounded-lg border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-sm font-semibold text-amber-200">La vigencia de esta promoción ya venció. Verifica los datos antes de renovar.</p>
+                @endif
             </div>
         @endif
         <form method="POST" action="{{ route('clientes.renovar', $cliente) }}" class="mt-6 space-y-4">

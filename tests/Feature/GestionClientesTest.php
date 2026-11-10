@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Cliente;
+use App\Models\Membresia;
 use App\Models\Pago;
 use App\Models\TipoMembresia;
 use App\Models\Usuario;
@@ -62,7 +63,7 @@ test('un operador puede crear un cliente sin correo ni documento y guardar su di
 
     $response = $this->get('/clientes')->assertOk();
 
-    expect(substr_count($response->getContent(), 'name="foto_documento"'))->toBe(2);
+    expect(substr_count($response->getContent(), 'name="institucion_documento"'))->toBe(2);
     expect(substr_count($response->getContent(), 'name="direccion"'))->toBe(2);
     expect(substr_count($response->getContent(), 'name="email"'))->toBe(0);
     expect(substr_count($response->getContent(), 'name="fecha_nacimiento"'))->toBe(0);
@@ -504,8 +505,8 @@ test('un administrador puede cambiar la vigencia de una membresía y auditar los
     $this->actingAs($administrador)
         ->get('/clientes')
         ->assertOk()
-        ->assertSee('Editar vigencia')
-        ->assertSee('min="'.now()->toDateString().'"', false);
+        ->assertSee('Editar membresía')
+        ->assertSee('name="monto"', false);
 
     $this->put(route('membresias.vigencia.update', $membresia), [
         'finalizacion' => $fechaNueva,
@@ -569,7 +570,7 @@ test('una recepcionista no puede cambiar la vigencia de una membresía', functio
     $this->actingAs($recepcionista)
         ->get('/clientes')
         ->assertOk()
-        ->assertDontSee('Editar vigencia');
+        ->assertDontSee('Editar membresía');
 
     $this->put(route('membresias.vigencia.update', $membresia), [
         'finalizacion' => now()->addYear()->toDateString(),
@@ -619,6 +620,167 @@ test('rechaza una vigencia anterior al día actual y no registra el cambio', fun
     $this->assertDatabaseMissing('registros', [
         'accion' => 'membresia.vigencia.actualizada',
     ]);
+});
+
+test('un administrador puede corregir una membresía y su importe dejando el cambio auditado', function () {
+    $administrador = Usuario::create([
+        'name' => 'Cristian',
+        'username' => 'admin.editar.membresia',
+        'role' => Usuario::ROLE_ADMINISTRADOR,
+        'email' => null,
+        'password' => 'password',
+    ]);
+    $cliente = Cliente::create(['nombre' => 'Ana', 'apellido' => 'García']);
+    $planAnterior = TipoMembresia::create([
+        'nombre' => 'Plan anterior',
+        'duracion_dias' => 30,
+        'precio' => 350,
+        'activo' => true,
+    ]);
+    $planNuevo = TipoMembresia::create([
+        'nombre' => 'Plan corregido',
+        'duracion_dias' => 60,
+        'precio' => 500,
+        'activo' => true,
+    ]);
+    $inicioAnterior = today()->toDateString();
+    $finAnterior = today()->addDays(29)->toDateString();
+    $inicioNuevo = today()->subDay()->toDateString();
+    $finNuevo = today()->addDays(58)->toDateString();
+    $membresia = $cliente->membresias()->create([
+        'tipo_membresia_id' => $planAnterior->id,
+        'comienzo' => $inicioAnterior,
+        'finalizacion' => $finAnterior,
+        'estado' => Membresia::ESTADO_ACTIVA,
+    ]);
+    $pago = Pago::create([
+        'id_cliente' => $cliente->id,
+        'membresia_id' => $membresia->id,
+        'tipo_membresia_id' => $planAnterior->id,
+        'monto' => 350,
+        'metodo_pago' => 'efectivo',
+    ]);
+
+    $this->actingAs($administrador)
+        ->put(route('membresias.update', $membresia), [
+            'tipo_membresia_id' => $planNuevo->id,
+            'comienzo' => $inicioNuevo,
+            'finalizacion' => $finNuevo,
+            'monto' => '275.50',
+        ])
+        ->assertRedirect('/clientes')
+        ->assertSessionHas('success', 'Membresía actualizada y registrada en auditoría.');
+
+    $this->assertDatabaseHas('membresias', [
+        'id' => $membresia->id,
+        'tipo_membresia_id' => $planNuevo->id,
+    ]);
+    expect($membresia->refresh()->comienzo->toDateString())->toBe($inicioNuevo)
+        ->and($membresia->finalizacion->toDateString())->toBe($finNuevo);
+    $this->assertDatabaseHas('pagos', [
+        'id' => $pago->id,
+        'tipo_membresia_id' => $planNuevo->id,
+        'monto' => '275.50',
+    ]);
+    $this->assertDatabaseHas('registros', [
+        'usuario_id' => $administrador->id,
+        'accion' => 'membresia.actualizada',
+        'tipo' => $membresia->getMorphClass(),
+        'id_registro' => $membresia->id,
+    ]);
+
+    $metadatos = DB::table('registros')
+        ->where('accion', 'membresia.actualizada')
+        ->value('metadatos');
+    expect(json_decode($metadatos, true, flags: JSON_THROW_ON_ERROR))->toBe([
+        'cambios' => [
+            'tipo_membresia_id' => ['anterior' => $planAnterior->id, 'nuevo' => $planNuevo->id],
+            'comienzo' => ['anterior' => $inicioAnterior, 'nuevo' => $inicioNuevo],
+            'finalizacion' => ['anterior' => $finAnterior, 'nuevo' => $finNuevo],
+            'monto' => ['anterior' => '350.00', 'nuevo' => '275.50'],
+        ],
+    ]);
+
+    $this->actingAs($administrador)
+        ->put(route('membresias.update', $membresia), [
+            'tipo_membresia_id' => $planNuevo->id,
+            'comienzo' => $inicioNuevo,
+            'finalizacion' => $finNuevo,
+            'monto' => '275.50',
+        ])
+        ->assertRedirect('/clientes')
+        ->assertSessionHas('success', 'La membresía ya tenía esos datos; no se registró ningún cambio.');
+
+    expect(DB::table('registros')->where('accion', 'membresia.actualizada')->count())->toBe(1);
+});
+
+test('una recepcionista no puede editar una membresía', function () {
+    $recepcionista = Usuario::create([
+        'name' => 'Recepción',
+        'username' => 'recepcion.editar.membresia',
+        'role' => Usuario::ROLE_RECEPCIONISTA,
+        'email' => null,
+        'password' => 'password',
+    ]);
+    $cliente = Cliente::create(['nombre' => 'Ana', 'apellido' => 'García']);
+    $plan = TipoMembresia::create([
+        'nombre' => 'Plan de prueba',
+        'duracion_dias' => 30,
+        'precio' => 350,
+        'activo' => true,
+    ]);
+    $membresia = $cliente->membresias()->create([
+        'tipo_membresia_id' => $plan->id,
+        'comienzo' => today(),
+        'finalizacion' => today()->addDays(29),
+        'estado' => Membresia::ESTADO_ACTIVA,
+    ]);
+
+    $this->actingAs($recepcionista)
+        ->put(route('membresias.update', $membresia), [
+            'tipo_membresia_id' => $plan->id,
+            'comienzo' => today()->toDateString(),
+            'finalizacion' => today()->addDays(29)->toDateString(),
+        ])
+        ->assertForbidden();
+
+    $this->assertDatabaseMissing('registros', ['accion' => 'membresia.actualizada']);
+});
+
+test('no permite finalizar una membresía antes de su inicio', function () {
+    $administrador = Usuario::create([
+        'name' => 'Cristian',
+        'username' => 'admin.editar.membresia.fecha',
+        'role' => Usuario::ROLE_ADMINISTRADOR,
+        'email' => null,
+        'password' => 'password',
+    ]);
+    $cliente = Cliente::create(['nombre' => 'Ana', 'apellido' => 'García']);
+    $plan = TipoMembresia::create([
+        'nombre' => 'Plan de prueba',
+        'duracion_dias' => 30,
+        'precio' => 350,
+        'activo' => true,
+    ]);
+    $membresia = $cliente->membresias()->create([
+        'tipo_membresia_id' => $plan->id,
+        'comienzo' => today(),
+        'finalizacion' => today()->addDays(29),
+        'estado' => Membresia::ESTADO_ACTIVA,
+    ]);
+
+    $this->actingAs($administrador)
+        ->put(route('membresias.update', $membresia), [
+            'tipo_membresia_id' => $plan->id,
+            'comienzo' => today()->toDateString(),
+            'finalizacion' => today()->subDay()->toDateString(),
+        ])
+        ->assertSessionHasErrors([
+            'finalizacion' => 'La fecha de finalización debe ser igual o posterior al inicio.',
+        ]);
+
+    expect($membresia->refresh()->finalizacion->toDateString())->toBe(today()->addDays(29)->toDateString());
+    $this->assertDatabaseMissing('registros', ['accion' => 'membresia.actualizada']);
 });
 
 test('un operador puede imprimir dos tickets para una renovación solicitada', function () {
@@ -898,40 +1060,42 @@ test('un operador puede guardar la foto de un cliente', function () {
     Storage::disk('public')->assertExists($cliente->foto);
 });
 
-test('un operador puede guardar y ver la imagen del documento al renovar', function () {
-    Storage::fake('local');
+test('un operador puede capturar manualmente datos institucionales y revisar su vigencia al renovar', function () {
     $usuario = Usuario::create([
         'name' => 'Operador',
         'email' => 'operador.documento@example.com',
         'password' => 'password',
     ]);
+    $vigenciaVencida = today()->subDay()->toDateString();
 
     $this->actingAs($usuario)
         ->post('/clientes', [
             'nombre' => 'Marta',
             'apellido' => 'Documento',
-            'foto_documento' => UploadedFile::fake()->image('documento.jpg'),
+            'institucion_documento' => 'Universidad Nacional',
+            'vigencia_documento' => $vigenciaVencida,
+            'detalles_documento' => 'Promoción para estudiantes',
         ])
         ->assertRedirect('/clientes');
 
     $cliente = Cliente::query()->where('apellido', 'Documento')->firstOrFail();
 
-    expect($cliente->foto_documento)->toStartWith('documentos/clientes/');
-    Storage::disk('local')->assertExists($cliente->foto_documento);
-
-    $this->get(route('clientes.documento', $cliente))
-        ->assertOk()
-        ->assertHeader('Content-Type', 'image/jpeg')
-        ->assertHeader('Cache-Control', 'no-store, private');
+    $this->assertDatabaseHas('clientes', [
+        'id' => $cliente->id,
+        'institucion_documento' => 'Universidad Nacional',
+        'detalles_documento' => 'Promoción para estudiantes',
+    ]);
+    expect($cliente->vigencia_documento->toDateString())->toBe($vigenciaVencida);
 
     $this->get(route('clientes.index', ['abrir_renovacion' => $cliente->id]))
         ->assertOk()
-        ->assertSee('Documento del cliente')
-        ->assertSee(route('clientes.documento', $cliente), false);
+        ->assertSee('Datos de promoción institucional')
+        ->assertSee('Universidad Nacional')
+        ->assertSee('Promoción para estudiantes')
+        ->assertSee('La vigencia de esta promoción ya venció.');
 });
 
-test('un operador puede agregar la imagen del documento al editar un cliente', function () {
-    Storage::fake('local');
+test('un operador puede actualizar los datos institucionales desde el formulario del cliente', function () {
     $usuario = Usuario::create([
         'name' => 'Operador',
         'email' => 'operador.editar.documento@example.com',
@@ -946,23 +1110,15 @@ test('un operador puede agregar la imagen del documento al editar un cliente', f
         ->put(route('clientes.update', $cliente), [
             'nombre' => 'Marta',
             'apellido' => 'Actualización',
-            'foto_documento' => UploadedFile::fake()->image('documento.png'),
+            'institucion_documento' => 'Instituto del Centro',
+            'vigencia_documento' => today()->addMonth()->toDateString(),
+            'detalles_documento' => 'Credencial verificada en recepción',
         ])
         ->assertRedirect('/clientes');
 
     $cliente->refresh();
 
-    expect($cliente->foto_documento)->not->toBeNull();
-    Storage::disk('local')->assertExists($cliente->foto_documento);
-});
-
-test('la imagen del documento no es accesible sin iniciar sesión', function () {
-    $cliente = Cliente::create([
-        'nombre' => 'Marta',
-        'apellido' => 'Privado',
-        'foto_documento' => 'documentos/clientes/documento.jpg',
-    ]);
-
-    $this->get(route('clientes.documento', $cliente))
-        ->assertRedirect(route('login'));
+    expect($cliente->institucion_documento)->toBe('Instituto del Centro')
+        ->and($cliente->vigencia_documento->toDateString())->toBe(today()->addMonth()->toDateString())
+        ->and($cliente->detalles_documento)->toBe('Credencial verificada en recepción');
 });

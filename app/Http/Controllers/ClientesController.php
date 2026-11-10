@@ -21,8 +21,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ClientesController extends Controller
 {
@@ -30,7 +30,10 @@ class ClientesController extends Controller
     {
         $clientes = Cliente::query()
             ->with([
-                'membresias' => fn ($query) => $query->latest('finalizacion')->with('plan'),
+                'membresias' => fn ($query) => $query->latest('finalizacion')->with([
+                    'plan',
+                    'pagos' => fn ($query) => $query->latest('id'),
+                ]),
                 'credencialesBiometricas' => fn ($query) => $query->where('estado', true),
             ])
             ->when($request->filled('buscar'), function ($query) use ($request): void {
@@ -80,14 +83,6 @@ class ClientesController extends Controller
             unset($data['foto']);
         }
 
-        $fotoDocumento = $request->file('foto_documento');
-
-        if ($fotoDocumento !== null) {
-            $data['foto_documento'] = $this->storeDocumentPhoto($fotoDocumento);
-        } else {
-            unset($data['foto_documento']);
-        }
-
         $cliente = Cliente::create($data);
         $redirect = to_route('clientes.index')->with('success', 'Cliente creado correctamente.');
 
@@ -102,20 +97,12 @@ class ClientesController extends Controller
     {
         $data = $this->validatedData($request, $cliente);
         $fotoAnterior = $cliente->foto;
-        $fotoDocumentoAnterior = $cliente->foto_documento;
         $foto = $request->file('foto');
-        $fotoDocumento = $request->file('foto_documento');
 
         if ($foto !== null) {
             $data['foto'] = $this->storePhoto($foto);
         } else {
             unset($data['foto']);
-        }
-
-        if ($fotoDocumento !== null) {
-            $data['foto_documento'] = $this->storeDocumentPhoto($fotoDocumento);
-        } else {
-            unset($data['foto_documento']);
         }
 
         $cliente->update($data);
@@ -124,21 +111,116 @@ class ClientesController extends Controller
             Storage::disk('public')->delete($fotoAnterior);
         }
 
-        if ($fotoDocumento !== null && $fotoDocumentoAnterior !== null) {
-            Storage::disk('local')->delete($fotoDocumentoAnterior);
-        }
-
         return to_route('clientes.index')->with('success', 'Cliente actualizado correctamente.');
     }
 
-    public function mostrarDocumento(Cliente $cliente): StreamedResponse
-    {
-        abort_if($cliente->foto_documento === null, 404);
+    public function actualizarMembresia(
+        Request $request,
+        Membresia $membresia,
+        AuditoriaServicio $auditoria,
+    ): RedirectResponse {
+        $administrador = $request->user();
 
-        return Storage::disk('local')->response($cliente->foto_documento, null, [
-            'Cache-Control' => 'private, no-store',
-            'X-Content-Type-Options' => 'nosniff',
+        if (! ($administrador instanceof Usuario) || ! $administrador->esAdministrador()) {
+            abort(403);
+        }
+
+        $tienePago = $membresia->pagos()->exists();
+        $data = $request->validate([
+            'tipo_membresia_id' => ['required', 'integer', Rule::exists('tipo_membresias', 'id')],
+            'comienzo' => ['required', 'date_format:Y-m-d'],
+            'finalizacion' => ['required', 'date_format:Y-m-d', 'after_or_equal:comienzo'],
+            'monto' => [
+                $tienePago ? 'required' : 'prohibited',
+                'numeric',
+                'min:0',
+                'max:99999999.99',
+            ],
+        ], [
+            'finalizacion.after_or_equal' => 'La fecha de finalización debe ser igual o posterior al inicio.',
+            'monto.prohibited' => 'No hay un pago asociado para actualizar el importe.',
         ]);
+
+        $actualizado = DB::transaction(function () use ($membresia, $administrador, $auditoria, $data): bool {
+            $membresiaBloqueada = Membresia::query()
+                ->lockForUpdate()
+                ->findOrFail($membresia->getKey());
+            $pago = $membresiaBloqueada->pagos()
+                ->lockForUpdate()
+                ->latest('id')
+                ->first();
+
+            if ($pago === null && array_key_exists('monto', $data)) {
+                throw ValidationException::withMessages([
+                    'monto' => 'No hay un pago asociado para actualizar el importe.',
+                ]);
+            }
+
+            $cambios = [];
+            $campos = [
+                'tipo_membresia_id' => (int) $data['tipo_membresia_id'],
+                'comienzo' => $data['comienzo'],
+                'finalizacion' => $data['finalizacion'],
+            ];
+
+            foreach ($campos as $campo => $valorNuevo) {
+                $valorAnterior = $campo === 'tipo_membresia_id'
+                    ? (int) $membresiaBloqueada->{$campo}
+                    : $membresiaBloqueada->{$campo}->toDateString();
+
+                if ($valorAnterior !== $valorNuevo) {
+                    $cambios[$campo] = [
+                        'anterior' => $valorAnterior,
+                        'nuevo' => $valorNuevo,
+                    ];
+                    $membresiaBloqueada->{$campo} = $valorNuevo;
+                }
+            }
+
+            $montoNuevo = array_key_exists('monto', $data)
+                ? number_format((float) $data['monto'], 2, '.', '')
+                : null;
+            $montoAnterior = $pago === null
+                ? null
+                : number_format((float) $pago->monto, 2, '.', '');
+
+            if ($montoNuevo !== null && $montoNuevo !== $montoAnterior) {
+                $cambios['monto'] = [
+                    'anterior' => $montoAnterior,
+                    'nuevo' => $montoNuevo,
+                ];
+                $pago->monto = $montoNuevo;
+            }
+
+            if ($cambios === []) {
+                return false;
+            }
+
+            $membresiaBloqueada->save();
+
+            if ($pago !== null && array_key_exists('tipo_membresia_id', $cambios)) {
+                $pago->tipo_membresia_id = $data['tipo_membresia_id'];
+                $pago->save();
+            } elseif ($pago !== null && array_key_exists('monto', $cambios)) {
+                $pago->save();
+            }
+
+            $auditoria->registrar(
+                accion: 'membresia.actualizada',
+                registro: $membresiaBloqueada,
+                metadatos: ['cambios' => $cambios],
+                usuarioId: $administrador->id,
+            );
+
+            return true;
+        });
+
+        return to_route('clientes.index')->with(
+            'success',
+            $actualizado
+                ? 'Membresía actualizada y registrada en auditoría.'
+                : 'La membresía ya tenía esos datos; no se registró ningún cambio.',
+        );
     }
 
     public function renovar(
@@ -314,25 +396,10 @@ class ClientesController extends Controller
                 'max:5120',
                 'dimensions:max_width=2000,max_height=2000',
             ],
-            'foto_documento' => [
-                'nullable',
-                'image',
-                'mimes:jpeg,jpg,png,webp',
-                'max:5120',
-                'dimensions:max_width=6000,max_height=6000',
-            ],
+            'institucion_documento' => ['nullable', 'string', 'max:255'],
+            'vigencia_documento' => ['nullable', 'date_format:Y-m-d'],
+            'detalles_documento' => ['nullable', 'string', 'max:5000'],
         ]);
-    }
-
-    private function storeDocumentPhoto(UploadedFile $fotoDocumento): string
-    {
-        $path = $fotoDocumento->store('documentos/clientes', 'local');
-
-        if ($path === false) {
-            throw new \RuntimeException('No fue posible guardar la imagen del documento.');
-        }
-
-        return $path;
     }
 
     private function storePhoto(UploadedFile $foto): string

@@ -7,13 +7,18 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['nombre', 'apellido', 'email', 'telefono', 'documento', 'fecha_nacimiento', 'direccion', 'foto', 'foto_documento', 'estado'])]
+#[Fillable(['nombre', 'apellido', 'email', 'telefono', 'documento', 'fecha_nacimiento', 'direccion', 'foto', 'institucion_documento', 'vigencia_documento', 'detalles_documento', 'estado'])]
 #[SoftDeletable]
 class Cliente extends Model
 {
     protected $table = 'clientes';
 
     use SoftDeletes;
+
+    protected function casts(): array
+    {
+        return ['vigencia_documento' => 'date'];
+    }
 
     public function membresias(): HasMany
     {
