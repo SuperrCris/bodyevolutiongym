@@ -38,8 +38,8 @@
     </div>
     <div class="space-y-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
         <div>
-            <h3 class="text-sm font-semibold text-slate-200">Promoción por institución</h3>
-            <p class="mt-1 text-xs text-slate-400">Registra manualmente los datos para validar promociones de estudiantes u otras instituciones. Todos son opcionales.</p>
+            <h3 class="text-sm font-semibold text-slate-200">Documento de promoción</h3>
+            <p class="mt-1 text-xs text-slate-400">Se removieron las fotos, ahora los datos se capturan manualmente</p>
         </div>
         <div class="grid gap-4 sm:grid-cols-2">
             <label class="block">
