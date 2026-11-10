@@ -69,13 +69,13 @@ jobs:
 
       - name: Set up PHP dependencies
         run: composer install --no-dev --no-interaction --prefer-dist --no-progress --optimize-autoloader
-        shell: pwsh
+        shell: powershell
 
       - name: Build frontend
         run: |
           npm ci
           npm run build
-        shell: pwsh
+        shell: powershell
 
       - name: Deploy to local production system
         run: |
@@ -83,6 +83,6 @@ jobs:
             throw 'Set the PRODUCTION_PATH Actions variable to the existing Laravel installation directory.'
           }
           .\.github\scripts\deploy-production.ps1 -DeployPath $env:PRODUCTION_PATH
-        shell: pwsh
+        shell: powershell
         env:
           PRODUCTION_PATH: ${{ vars.PRODUCTION_PATH }}
