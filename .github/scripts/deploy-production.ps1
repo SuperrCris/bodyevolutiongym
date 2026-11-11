@@ -107,6 +107,12 @@ try {
             throw "robocopy.exe failed with exit code $LASTEXITCODE."
         }
 
+        $publicStorageLink = Join-Path $DeployPath 'public\storage'
+
+        if (-not (Test-Path -LiteralPath $publicStorageLink)) {
+            Invoke-CheckedCommand -FilePath $PhpExecutable -Arguments @('artisan', 'storage:link')
+        }
+
         Invoke-CheckedCommand -FilePath $PhpExecutable -Arguments @('artisan', 'migrate', '--force')
         Invoke-CheckedCommand -FilePath $PhpExecutable -Arguments @('artisan', 'optimize')
     }

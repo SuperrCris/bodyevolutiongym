@@ -76,6 +76,17 @@ if ($LASTEXITCODE -ne 0) {
     throw "La inicialización de la base de datos falló. Código de salida: $LASTEXITCODE."
 }
 
+$publicStorageLink = Join-Path $root 'public\storage'
+
+if (-not (Test-Path -LiteralPath $publicStorageLink)) {
+    Write-Host 'Creando enlace público para los archivos...'
+    php artisan storage:link --no-interaction
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "No se pudo crear el enlace público para los archivos. Código de salida: $LASTEXITCODE."
+    }
+}
+
 Write-Host ''
 Write-Host 'Base de datos inicializada correctamente.'
 Write-Host 'Usuario inicial: cristian'

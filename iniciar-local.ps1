@@ -296,6 +296,17 @@ Write-Host "Puente Java disponible en $bridgeHealthUrl."
 Write-Host 'Verificando conexión a la base de datos...'
 Test-DatabaseConnection -PhpPath $php -ArtisanPath $artisan
 
+$publicStorageLink = Join-Path $publicDirectory 'storage'
+
+if (-not (Test-Path -LiteralPath $publicStorageLink)) {
+    Write-Host 'Creando enlace público para los archivos...'
+    & $php $artisan storage:link --no-interaction
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "No se pudo crear el enlace público para los archivos. Código de salida: $LASTEXITCODE."
+    }
+}
+
 Write-Host 'Limpiando cachés de Laravel...'
 $salidaLimpieza = & $php $artisan optimize:clear --no-interaction 2>&1
 

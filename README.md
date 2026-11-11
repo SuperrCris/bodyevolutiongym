@@ -32,7 +32,7 @@ Aplicación web para la operación diaria de un gimnasio: clientes, membresías,
    .\inicializar-base.ps1
    ```
 
-   El script instala dependencias PHP si falta `vendor`, genera `APP_KEY` si está vacía y ejecuta migraciones y seeders. No crea la base de datos ni elimina o reinicia tablas existentes. Usa `-OmitirDependencias` solo si las dependencias PHP ya están instaladas.
+   El script instala dependencias PHP si falta `vendor`, genera `APP_KEY` si está vacía, ejecuta migraciones y seeders, y crea el enlace `public/storage` para servir los archivos del disco público, incluidas las fotos de clientes. No crea la base de datos ni elimina o reinicia tablas existentes. Usa `-OmitirDependencias` solo si las dependencias PHP ya están instaladas.
 
 5. Instala y compila los recursos del frontend:
 
@@ -51,7 +51,7 @@ Para iniciar el stack local integrado, ejecuta desde PowerShell:
 .\iniciar-local.ps1
 ```
 
-El script solicita elevación de permisos, inicia o reinicia el servicio SQL Server Express `MSSQL$SQLEXPRESS` si está instalado, compila y levanta el puente biométrico, comprueba la conexión configurada en `.env` y sirve Laravel en `http://127.0.0.1:8000`. Si encuentra Google Chrome, abre la aplicación. Laravel se ejecuta en primer plano; usa `Ctrl+C` para detenerlo. Si el servidor termina con error, el script intenta iniciarlo de nuevo.
+El script solicita elevación de permisos, inicia o reinicia el servicio SQL Server Express `MSSQL$SQLEXPRESS` si está instalado, compila y levanta el puente biométrico, comprueba la conexión configurada en `.env`, crea el enlace `public/storage` si falta y sirve Laravel en `http://127.0.0.1:8000`. Si encuentra Google Chrome, abre la aplicación. Laravel se ejecuta en primer plano; usa `Ctrl+C` para detenerlo. Si el servidor termina con error, el script intenta iniciarlo de nuevo.
 
 La conexión efectiva a la base de datos depende de `DB_CONNECTION` y las demás variables `DB_*` de `.env`; el servicio SQL Server Express que administra el script no cambia esa configuración.
 
