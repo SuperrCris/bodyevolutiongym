@@ -216,7 +216,9 @@ class ReporteDiarioExcelExportador
                     $fila[1] = $membresia->cliente_id === null
                         ? (trim((string) $membresia->nombre_comprador) ?: 'Venta sin cliente')
                         : trim($membresia->cliente_nombre.' '.$membresia->cliente_apellido);
-                    $fila[2] = CarbonImmutable::parse($membresia->fecha)->format('d/m/Y H:i');
+                    $fila[2] = CarbonImmutable::parse($membresia->fecha, 'UTC')
+                        ->setTimezone((string) config('app.display_timezone'))
+                        ->format('d/m/Y H:i');
                     $fila[3] = $this->nombreMetodo($membresia->metodo_pago);
                     $fila[4] = (float) $membresia->monto;
                     $fila[5] = $membresia->tipo_membresia ?? 'Membresía';

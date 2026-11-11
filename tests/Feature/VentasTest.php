@@ -7,6 +7,7 @@ use App\Models\Registros;
 use App\Models\TipoMembresia;
 use App\Models\Usuario;
 use Illuminate\Http\Client\Request as ClientRequest;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
 test('una recepcionista registra una venta de membresía sin asignarla a un cliente y aparece en reportes', function () {
@@ -65,11 +66,56 @@ test('una recepcionista registra una venta de membresía sin asignarla a un clie
         ->assertSee('Pase de un día')
         ->assertSee('name="metodo_pago"', false);
 
-    $this->get(route('reportes.index', ['fecha' => today()->toDateString()]))
+    $this->get(route('reportes.index', ['fecha' => now(config('app.display_timezone'))->toDateString()]))
         ->assertOk()
         ->assertSee('Pase mostrador')
         ->assertSee('Pase de un día')
         ->assertSee('$25.00');
+});
+
+it('muestra las fechas de ventas en el horario local en el historial y los reportes', function () {
+    $recepcionista = Usuario::create([
+        'name' => 'Recepción',
+        'username' => 'recepcion',
+        'role' => Usuario::ROLE_RECEPCIONISTA,
+        'email' => null,
+        'password' => 'password',
+    ]);
+    $plan = TipoMembresia::create([
+        'nombre' => 'Plan mensual',
+        'duracion_dias' => 30,
+        'precio' => 300.00,
+        'activo' => true,
+    ]);
+    $pago = Pago::create([
+        'tipo_membresia_id' => $plan->id,
+        'usuario_id' => $recepcionista->id,
+        'monto' => 300.00,
+        'metodo_pago' => 'efectivo',
+        'nombre_comprador' => 'Venta de prueba',
+    ]);
+    DB::table('pagos')->where('id', $pago->id)->update([
+        'created_at' => '2026-11-10 00:07:00',
+        'updated_at' => '2026-11-10 00:07:00',
+    ]);
+
+    $this->actingAs($recepcionista)
+        ->get(route('ventas.index'))
+        ->assertOk()
+        ->assertSee('09/11/2026 17:07');
+
+    $this->get(route('reportes.index', ['fecha' => '2026-11-09']))
+        ->assertOk()
+        ->assertSee('09/11/2026 17:07');
+
+    $excel = $this->get(route('reportes.excel', ['fecha' => '2026-11-09']))
+        ->assertOk();
+    $libro = new ZipArchive;
+    expect($libro->open($excel->baseResponse->getFile()->getPathname()))->toBeTrue();
+    $hoja = $libro->getFromName('xl/worksheets/sheet1.xml');
+    $libro->close();
+
+    expect($hoja)->toContain('09/11/2026 17:07');
 });
 
 test('una recepcionista puede corregir el método de pago de una venta existente', function () {

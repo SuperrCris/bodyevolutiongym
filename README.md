@@ -16,7 +16,7 @@ Aplicación web para la operación diaria de un gimnasio: clientes, membresías,
 ## Requisitos
 
 - Windows para los scripts de inicio y la integración con dispositivos.
-- PHP 8.4 o superior y Composer.
+- PHP 8.4.1 o superior y Composer; mantén PHP actualizado a la última versión de seguridad de su rama.
 - Node.js y npm para compilar los recursos de Vite.
 - PostgreSQL, que es el motor configurado en `.env.example`. `config/database.php` también define conexiones para SQLite, MySQL, MariaDB y SQL Server; configura el motor y sus credenciales en `.env`.
 - Para huellas e impresión: JDK 21, los controladores y el SDK Java de DigitalPersona instalados en `C:\Program Files\DigitalPersona\Bin\Java`, lector compatible y, para recibos, una impresora predeterminada configurada en Windows.

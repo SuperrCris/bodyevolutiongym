@@ -104,7 +104,7 @@ class ReportesController extends Controller
 
     public function exportar(Request $request, ReporteFinancieroServicio $reporte): StreamedResponse
     {
-        $ahora = CarbonImmutable::now();
+        $ahora = CarbonImmutable::now((string) config('app.display_timezone'));
         [$desde, $hasta] = $this->rango($request, $ahora->startOfMonth(), $ahora->endOfDay());
         $movimientos = $reporte->movimientos($desde, $hasta);
         $nombreArchivo = 'reporte-financiero-'.$desde->toDateString().'-'.$hasta->toDateString().'.csv';
@@ -132,7 +132,11 @@ class ReportesController extends Controller
                     $movimiento->tipo_movimiento,
                     $this->protegerCeldaCsv($movimiento->categoria),
                     $this->protegerCeldaCsv($movimiento->concepto),
-                    $movimiento->fecha,
+                    $movimiento->tipo_movimiento === 'ingreso'
+                        ? CarbonImmutable::parse($movimiento->fecha, 'UTC')
+                            ->setTimezone((string) config('app.display_timezone'))
+                            ->format('Y-m-d H:i:s')
+                        : $movimiento->fecha,
                     $this->protegerCeldaCsv($movimiento->metodo_pago),
                     $movimiento->ingreso,
                     $movimiento->egreso,
@@ -175,7 +179,8 @@ class ReportesController extends Controller
             'hora_hasta' => ['nullable', 'date_format:H:i'],
         ]);
 
-        $fechaPredeterminada = today()->toDateString();
+        $zonaHoraria = (string) config('app.display_timezone');
+        $fechaPredeterminada = CarbonImmutable::now($zonaHoraria)->toDateString();
         $desdeFecha = $datos['desde']
             ?? $datos['fecha']
             ?? $desdePredeterminado?->toDateString()
@@ -192,8 +197,8 @@ class ReportesController extends Controller
         $horaHasta = $datos['hora_hasta']
             ?? (($datos['fecha'] ?? null) === null ? $hastaPredeterminado?->format('H:i') : null)
             ?? '23:59';
-        $desde = CarbonImmutable::parse($desdeFecha.' '.$horaDesde);
-        $hasta = CarbonImmutable::parse($hastaFecha.' '.$horaHasta)->endOfMinute();
+        $desde = CarbonImmutable::parse($desdeFecha.' '.$horaDesde, $zonaHoraria);
+        $hasta = CarbonImmutable::parse($hastaFecha.' '.$horaHasta, $zonaHoraria)->endOfMinute();
 
         if ($hasta->lessThan($desde)) {
             throw ValidationException::withMessages([

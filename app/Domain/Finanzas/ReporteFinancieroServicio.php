@@ -34,6 +34,7 @@ class ReporteFinancieroServicio
      */
     public function cortePeriodo(CarbonImmutable $desde, CarbonImmutable $hasta): array
     {
+        [$desdeUtc, $hastaUtc] = $this->rangoUtc($desde, $hasta);
         $membresiasPorMetodo = array_fill_keys(array_keys(self::METODOS_PAGO), 0);
 
         $pagos = DB::table('pagos')
@@ -41,7 +42,7 @@ class ReporteFinancieroServicio
                 $query->whereNotNull('membresia_id')
                     ->orWhereNotNull('tipo_membresia_id');
             })
-            ->whereBetween('created_at', [$desde, $hasta])
+            ->whereBetween('created_at', [$desdeUtc, $hastaUtc])
             ->select('metodo_pago')
             ->selectRaw('SUM(monto) AS total')
             ->groupBy('metodo_pago')
@@ -192,13 +193,14 @@ class ReporteFinancieroServicio
      */
     public function resumen(CarbonImmutable $desde, CarbonImmutable $hasta): array
     {
+        [$desdeUtc, $hastaUtc] = $this->rangoUtc($desde, $hasta);
         $ingresosMembresias = $this->centavos(Pago::query()
             ->whereNotNull('membresia_id')
-            ->whereBetween('created_at', [$desde, $hasta])
+            ->whereBetween('created_at', [$desdeUtc, $hastaUtc])
             ->sum('monto'));
         $ingresosAdicionales = $this->centavos(Pago::query()
             ->whereNull('membresia_id')
-            ->whereBetween('created_at', [$desde, $hasta])
+            ->whereBetween('created_at', [$desdeUtc, $hastaUtc])
             ->sum('monto'));
         $totalIngresos = $ingresosMembresias + $ingresosAdicionales;
         $totalEgresos = $this->centavos(Egreso::query()
@@ -233,11 +235,12 @@ class ReporteFinancieroServicio
 
     public function movimientos(CarbonImmutable $desde, CarbonImmutable $hasta): Builder
     {
+        [$desdeUtc, $hastaUtc] = $this->rangoUtc($desde, $hasta);
         $ingresos = DB::table('pagos')
             ->leftJoin('membresias', 'membresias.id', '=', 'pagos.membresia_id')
             ->leftJoin('tipo_membresias as plan_membresia', 'plan_membresia.id', '=', 'membresias.tipo_membresia_id')
             ->leftJoin('tipo_membresias as plan_pago', 'plan_pago.id', '=', 'pagos.tipo_membresia_id')
-            ->whereBetween('pagos.created_at', [$desde, $hasta])
+            ->whereBetween('pagos.created_at', [$desdeUtc, $hastaUtc])
             ->selectRaw('? AS tipo_movimiento', ['ingreso'])
             ->selectRaw(
                 'CASE WHEN pagos.membresia_id IS NULL AND pagos.tipo_membresia_id IS NULL THEN ? ELSE ? END AS categoria',
@@ -272,6 +275,8 @@ class ReporteFinancieroServicio
 
     public function membresiasEnPeriodo(CarbonImmutable $desde, CarbonImmutable $hasta, ?int $clienteId = null): Builder
     {
+        [$desdeUtc, $hastaUtc] = $this->rangoUtc($desde, $hasta);
+
         return DB::table('pagos')
             ->leftJoin('membresias', 'membresias.id', '=', 'pagos.membresia_id')
             ->leftJoin('tipo_membresias as plan_membresia', 'plan_membresia.id', '=', 'membresias.tipo_membresia_id')
@@ -281,7 +286,7 @@ class ReporteFinancieroServicio
                 $query->whereNotNull('pagos.membresia_id')
                     ->orWhereNotNull('pagos.tipo_membresia_id');
             })
-            ->whereBetween('pagos.created_at', [$desde, $hasta])
+            ->whereBetween('pagos.created_at', [$desdeUtc, $hastaUtc])
             ->when($clienteId !== null, fn (Builder $query) => $query->where('pagos.id_cliente', $clienteId))
             ->addSelect(
                 'clientes.id AS cliente_id',
@@ -308,6 +313,17 @@ class ReporteFinancieroServicio
         $centavos = (int) str_pad(substr($decimal, 0, 2), 2, '0');
 
         return $signo * (((int) $entero * 100) + $centavos);
+    }
+
+    /**
+     * @return array{CarbonImmutable, CarbonImmutable}
+     */
+    private function rangoUtc(CarbonImmutable $desde, CarbonImmutable $hasta): array
+    {
+        return [
+            $desde->setTimezone('UTC'),
+            $hasta->setTimezone('UTC'),
+        ];
     }
 
     private function formatearCentavos(int $centavos): string

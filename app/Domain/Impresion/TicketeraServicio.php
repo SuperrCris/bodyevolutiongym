@@ -101,7 +101,7 @@ class TicketeraServicio
 
         $lineas[] = '';
         $lineas[] = 'Folio: #'.$pago->id;
-        $lineas[] = 'Fecha: '.$pago->created_at?->format('d/m/Y H:i');
+        $lineas[] = 'Fecha: '.$pago->created_at?->setTimezone((string) config('app.display_timezone'))->format('d/m/Y H:i');
         $lineas[] = 'Atendió: '.Str::squish($pago->usuario?->name ?? '—');
         $lineas[] = '';
         $lineas[] = match ($pago->metodo_pago) {

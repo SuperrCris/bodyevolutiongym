@@ -118,7 +118,7 @@
         <hr class="separador">
 
         <div class="fila"><span>Folio</span><span>#{{ $pago->id }}</span></div>
-        <div class="fila"><span>Fecha</span><span>{{ $pago->created_at?->format('d/m/Y H:i') ?? '—' }}</span></div>
+        <div class="fila"><span>Fecha</span><span>{{ $pago->created_at?->setTimezone(config('app.display_timezone'))->format('d/m/Y H:i') ?? '—' }}</span></div>
         <div class="fila"><span>Atendió</span><span>{{ $pago->usuario?->name ?? '—' }}</span></div>
 
         <hr class="separador">

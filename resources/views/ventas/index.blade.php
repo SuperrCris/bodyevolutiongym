@@ -36,7 +36,7 @@
                                 };
                             @endphp
                             <tr>
-                                <td class="whitespace-nowrap px-5 py-3 text-slate-300">{{ $pago->created_at?->format('d/m/Y H:i') ?? '—' }}</td>
+                                <td class="whitespace-nowrap px-5 py-3 text-slate-300">{{ $pago->created_at?->setTimezone(config('app.display_timezone'))->format('d/m/Y H:i') ?? '—' }}</td>
                                 <td class="px-5 py-3 font-medium text-white">
                                     {{ $pago->id_cliente === null ? ($pago->nombre_comprador ?: 'Venta sin cliente') : ($pago->cliente ? trim($pago->cliente->nombre.' '.$pago->cliente->apellido) : 'Cliente eliminado') }}
                                 </td>

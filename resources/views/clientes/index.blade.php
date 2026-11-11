@@ -236,7 +236,7 @@
         <canvas data-camera-canvas class="hidden"></canvas>
         <div class="mt-5 flex justify-end gap-3">
             <button type="button" data-close-camera class="rounded-xl border border-white/10 px-4 py-3 font-semibold text-slate-300 hover:border-white/30">Cancelar</button>
-            <button type="button" data-capture-photo class="button-primary px-5 py-3">Capturar foto</button>
+            <button type="button" data-capture-photo class="button-primary px-5 py-3 disabled:cursor-wait disabled:opacity-60">Capturar foto</button>
         </div>
     </div>
 </div>
@@ -362,6 +362,8 @@
             return;
         }
 
+        button.disabled = true;
+
         try {
             cameraStream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: 'user' },
@@ -373,31 +375,39 @@
         } catch (error) {
             stopCamera();
             window.alert('No fue posible activar la cámara. Verifica el permiso del navegador y que no esté siendo usada por otra aplicación.');
+        } finally {
+            button.disabled = false;
         }
     }));
 
     cameraModal?.querySelectorAll('[data-close-camera]').forEach((button) => button.addEventListener('click', stopCamera));
-    cameraModal?.querySelector('[data-capture-photo]')?.addEventListener('click', () => {
+    cameraModal?.querySelector('[data-capture-photo]')?.addEventListener('click', (event) => {
         if (!cameraInput || !cameraVideo || !cameraCanvas || cameraVideo.videoWidth === 0) {
             window.alert('La cámara todavía no está lista. Espera un momento e inténtalo de nuevo.');
             return;
         }
 
+        const button = event.currentTarget;
+        button.disabled = true;
         cameraCanvas.width = cameraVideo.videoWidth;
         cameraCanvas.height = cameraVideo.videoHeight;
         cameraCanvas.getContext('2d').drawImage(cameraVideo, 0, 0);
         cameraCanvas.toBlob((blob) => {
-            if (!blob || !cameraInput) {
-                window.alert('No fue posible capturar la imagen.');
-                return;
-            }
+            try {
+                if (!blob || !cameraInput) {
+                    window.alert('No fue posible capturar la imagen.');
+                    return;
+                }
 
-            const archivo = new File([blob], `${cameraInput.dataset.cameraInput}-cliente-${Date.now()}.jpg`, { type: 'image/jpeg' });
-            const archivos = new DataTransfer();
-            archivos.items.add(archivo);
-            cameraInput.files = archivos.files;
-            cameraInput.dispatchEvent(new Event('change', { bubbles: true }));
-            stopCamera();
+                const archivo = new File([blob], `${cameraInput.dataset.cameraInput}-cliente-${Date.now()}.jpg`, { type: 'image/jpeg' });
+                const archivos = new DataTransfer();
+                archivos.items.add(archivo);
+                cameraInput.files = archivos.files;
+                cameraInput.dispatchEvent(new Event('change', { bubbles: true }));
+                stopCamera();
+            } finally {
+                button.disabled = false;
+            }
         }, 'image/jpeg', 0.9);
     });
     setTimeout(() => document.querySelector('[data-toast]')?.remove(), 5000);

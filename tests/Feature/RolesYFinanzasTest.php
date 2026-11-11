@@ -291,7 +291,7 @@ test('el corte diario muestra membresías por método de pago y exporta el CSV d
         'fecha' => today(),
         'metodo_pago' => 'efectivo',
     ]);
-    $fecha = today()->toDateString();
+    $fecha = now(config('app.display_timezone'))->toDateString();
     $this->assertDatabaseHas('egresos', ['categoria' => 'Insumos']);
 
     $vista = $this->actingAs($recepcionista)
@@ -361,10 +361,10 @@ test('el reporte filtra membresías por fecha y hora e incluye completos los aju
         'activo' => true,
     ]);
     $fechas = [
-        ['nombre' => 'Antes', 'fecha' => '2026-10-28 14:59:59', 'monto' => 10.00],
-        ['nombre' => 'Inicio', 'fecha' => '2026-10-28 15:00:00', 'monto' => 100.00],
-        ['nombre' => 'Dentro', 'fecha' => '2026-10-29 10:00:59', 'monto' => 50.00],
-        ['nombre' => 'Después', 'fecha' => '2026-10-29 10:01:00', 'monto' => 20.00],
+        ['nombre' => 'Antes', 'fecha' => '2026-10-28 21:59:59', 'monto' => 10.00],
+        ['nombre' => 'Inicio', 'fecha' => '2026-10-28 22:00:00', 'monto' => 100.00],
+        ['nombre' => 'Dentro', 'fecha' => '2026-10-29 17:00:59', 'monto' => 50.00],
+        ['nombre' => 'Después', 'fecha' => '2026-10-29 17:01:00', 'monto' => 20.00],
     ];
 
     foreach ($fechas as $datosPago) {
@@ -414,6 +414,7 @@ test('el reporte filtra membresías por fecha y hora e incluye completos los aju
         ->get('/reportes?'.http_build_query($parametros))
         ->assertOk()
         ->assertSee('Inicio Prueba')
+        ->assertSee('28/10/2026 15:00')
         ->assertSee('Dentro Prueba')
         ->assertDontSee('Antes Prueba')
         ->assertDontSee('Después Prueba')
@@ -496,7 +497,7 @@ test('el reporte de membresías filtra la tabla y el Excel por ID de cliente', f
         'metodo_pago' => 'cash',
     ]);
 
-    $fecha = today()->toDateString();
+    $fecha = now(config('app.display_timezone'))->toDateString();
     $respuesta = $this->actingAs($recepcionista)
         ->get('/reportes?'.http_build_query(['fecha' => $fecha, 'cliente_id' => $clienteFiltrado->id]))
         ->assertOk()
@@ -580,7 +581,7 @@ test('una recepcionista guarda ajustes diarios por método y el total considera 
         'monto' => 499.00,
         'metodo_pago' => 'cash',
     ]);
-    $fecha = today()->toDateString();
+    $fecha = now(config('app.display_timezone'))->toDateString();
 
     $this->actingAs($recepcionista)
         ->post('/reportes/ajustes', [
