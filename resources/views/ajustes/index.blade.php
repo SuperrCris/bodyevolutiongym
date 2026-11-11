@@ -6,8 +6,13 @@
     <div class="space-y-6">
         <div>
             <h1 class="mt-2 text-3xl font-black text-white">Ajustes</h1>
-
         </div>
+
+        @if (session('error'))
+            <div role="alert" class="rounded-2xl border border-rose-300/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-100">
+                {{ session('error') }}
+            </div>
+        @endif
 
         <section class="panel p-5 shadow-xl sm:p-7">
             <div class="flex flex-wrap items-start justify-between gap-4">
@@ -90,7 +95,20 @@
                     </form>
                 </section>
 
+                <section class="panel flex flex-col gap-5 p-5 shadow-xl sm:p-7">
+                    <div>
+                        <p class="text-sm font-semibold uppercase tracking-[0.16em] text-teal-300">Base de datos</p>
+                        <h2 class="mt-2 text-xl font-bold text-white">Descargar respaldo</h2>
+                        <p class="mt-3 text-sm leading-6 text-slate-400">
+                            Descarga una copia SQL de la base de datos. Esta opción requiere PostgreSQL y sus herramientas
+                            de respaldo instaladas en el servidor.
+                        </p>
+                    </div>
 
+                    <a href="{{ route('ajustes.respaldo') }}" class="button-primary mt-auto inline-flex min-h-11 items-center justify-center px-5 py-3 text-center transition">
+                        Descargar respaldo SQL
+                    </a>
+                </section>
             </div>
         @endif
     </div>

@@ -49,6 +49,9 @@ Route::middleware('auth')->group(function (): void {
     });
 
     Route::middleware('rol:administrador')->group(function (): void {
+        Route::get('/ajustes/respaldo', [AjustesController::class, 'descargarRespaldo'])
+            ->middleware('throttle:2,1')
+            ->name('ajustes.respaldo');
         Route::put('/ajustes/ticket', [AjustesController::class, 'actualizarTicket'])
             ->name('ajustes.ticket.update');
         Route::put('/membresias/{membresia}', [ClientesController::class, 'actualizarMembresia'])

@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Ajustes\RespaldoBaseDatosServicio;
 use App\Models\Cliente;
 use App\Models\Membresia;
 use App\Models\Pago;
@@ -7,6 +8,7 @@ use App\Models\TipoMembresia;
 use App\Models\Usuario;
 use Illuminate\Http\Client\Request as ClientRequest;
 use Illuminate\Support\Facades\Http;
+use Mockery\MockInterface;
 
 test('una cuenta administradora puede consultar los valores predeterminados del ticket', function () {
     $administrador = Usuario::create([
@@ -23,7 +25,8 @@ test('una cuenta administradora puede consultar los valores predeterminados del 
         ->assertSee('BODY EVOLUTION GYM')
         ->assertSee('6421095410')
         ->assertSee('¡Gracias por tu preferencia!')
-        ->assertSee('Guardar ajustes');
+        ->assertSee('Guardar ajustes')
+        ->assertSee('Descargar respaldo SQL');
 });
 
 test('una recepcionista puede consultar ajustes pero no cambiar el ticket', function () {
@@ -40,14 +43,70 @@ test('una recepcionista puede consultar ajustes pero no cambiar el ticket', func
         ->assertOk()
         ->assertSee('Duración de las notificaciones')
         ->assertSee('name="duracion_notificacion_segundos"', false)
-        ->assertDontSee('name="encabezado"', false);
+        ->assertDontSee('name="encabezado"', false)
+        ->assertDontSee('Descargar respaldo SQL');
 
     $this->put(route('ajustes.ticket.update'), [
         'encabezado' => 'Encabezado no autorizado',
         'pie' => 'Pie no autorizado',
     ])->assertForbidden();
 
+    $this->get(route('ajustes.respaldo'))->assertForbidden();
+
     $this->assertDatabaseCount('ajustes_sistema', 0);
+});
+
+test('una persona administradora puede descargar el respaldo SQL', function () {
+    $administrador = Usuario::create([
+        'name' => 'Administradora',
+        'username' => 'administradora-respaldo',
+        'role' => Usuario::ROLE_ADMINISTRADOR,
+        'email' => null,
+        'password' => 'password',
+    ]);
+    $rutaRespaldo = tempnam(sys_get_temp_dir(), 'respaldo-prueba-');
+
+    if ($rutaRespaldo === false) {
+        throw new RuntimeException('No se pudo crear el archivo temporal de prueba.');
+    }
+
+    file_put_contents($rutaRespaldo, 'SELECT 1;');
+    $this->mock(RespaldoBaseDatosServicio::class, function (MockInterface $mock) use ($rutaRespaldo): void {
+        $mock->shouldReceive('generar')->once()->andReturn($rutaRespaldo);
+    });
+
+    try {
+        $this->actingAs($administrador)
+            ->get(route('ajustes.respaldo'))
+            ->assertOk()
+            ->assertDownload('respaldo-base-datos-'.now()->format('Y-m-d_His').'.sql')
+            ->assertHeader('Cache-Control', 'no-store, private');
+    } finally {
+        if (is_file($rutaRespaldo)) {
+            unlink($rutaRespaldo);
+        }
+    }
+});
+
+test('muestra un aviso cuando no se puede generar el respaldo', function () {
+    $administrador = Usuario::create([
+        'name' => 'Administradora',
+        'username' => 'administradora-respaldo-error',
+        'role' => Usuario::ROLE_ADMINISTRADOR,
+        'email' => null,
+        'password' => 'password',
+    ]);
+    $this->mock(RespaldoBaseDatosServicio::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('generar')
+            ->once()
+            ->andThrow(new RuntimeException('Error interno de respaldo.'));
+    });
+
+    $this->actingAs($administrador)
+        ->followingRedirects()
+        ->get(route('ajustes.respaldo'))
+        ->assertOk()
+        ->assertSee('No se pudo generar el respaldo de la base de datos. Revisa la configuración del servidor.');
 });
 
 test('cada rol puede guardar su tiempo personal para las notificaciones', function (string $role, string $username) {
@@ -257,4 +316,5 @@ test('usa los ajustes guardados en el recibo y la impresión y escapa el HTML', 
 
 test('redirige al inicio de sesión cuando una persona invitada consulta ajustes', function () {
     $this->get(route('ajustes.index'))->assertRedirect(route('login'));
+    $this->get(route('ajustes.respaldo'))->assertRedirect(route('login'));
 });

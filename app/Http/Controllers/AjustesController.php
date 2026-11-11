@@ -3,11 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Ajustes\AjustesTicketServicio;
+use App\Domain\Ajustes\RespaldoBaseDatosServicio;
 use App\Domain\Auditoria\AuditoriaServicio;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use RuntimeException;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class AjustesController extends Controller
 {
@@ -18,6 +21,27 @@ class AjustesController extends Controller
             'configuracionTicket' => $ajustesTicket->obtenerConfiguracion(),
             'duracionNotificacion' => $request->user()->duracion_notificacion_segundos,
         ]);
+    }
+
+    public function descargarRespaldo(RespaldoBaseDatosServicio $respaldo): BinaryFileResponse|RedirectResponse
+    {
+        try {
+            $ruta = $respaldo->generar();
+        } catch (RuntimeException $exception) {
+            report($exception);
+
+            return to_route('ajustes.index')->with(
+                'error',
+                'No se pudo generar el respaldo de la base de datos. Revisa la configuración del servidor.',
+            );
+        }
+
+        $nombreArchivo = 'respaldo-base-datos-'.now()->format('Y-m-d_His').'.sql';
+
+        return response()->download($ruta, $nombreArchivo, [
+            'Cache-Control' => 'no-store, private',
+            'Content-Type' => 'application/sql',
+        ])->deleteFileAfterSend(true);
     }
 
     public function actualizarNotificaciones(Request $request): RedirectResponse
