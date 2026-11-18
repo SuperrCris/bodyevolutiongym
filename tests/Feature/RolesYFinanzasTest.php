@@ -594,17 +594,17 @@ test('una recepcionista guarda ajustes diarios por método y el total considera 
                 ],
                 'transferencia' => [
                     ['concepto' => 'Aguas', 'monto' => '100.00'],
-                    ['concepto' => 'Salidas', 'monto' => '-100.00'],
+                    ['concepto' => 'Salidas', 'monto' => '20.00'],
                 ],
                 'tarjeta' => [
-                    ['concepto' => 'Aguas', 'monto' => null],
+                    ['concepto' => 'Aguas', 'monto' => '25.00'],
                     ['concepto' => 'Salidas', 'monto' => null],
                 ],
             ],
         ])
         ->assertRedirect("/reportes?fecha={$fecha}");
 
-    $this->assertDatabaseCount('reporte_ajustes_manuales', 5);
+    $this->assertDatabaseCount('reporte_ajustes_manuales', 6);
     $this->assertDatabaseHas('reporte_ajustes_manuales', [
         'fecha' => $fecha,
         'metodo_pago' => 'efectivo',
@@ -619,7 +619,7 @@ test('una recepcionista guarda ajustes diarios por método y el total considera 
     $vista = $this->get("/reportes?fecha={$fecha}")
         ->assertOk()
         ->assertSee('Venta especial')
-        ->assertSee('908.50');
+        ->assertSee('1,053.50');
 
     preg_match('/<tbody class="divide-y divide-white\/5">(.*?)<\/tbody>/s', $vista->getContent(), $filas);
     expect($filas[1] ?? '')
@@ -627,6 +627,24 @@ test('una recepcionista guarda ajustes diarios por método y el total considera 
         ->not->toContain('Venta especial')
         ->not->toContain('Aguas')
         ->not->toContain('Salidas');
+
+    $excel = $this->get("/reportes/excel?fecha={$fecha}")->assertOk();
+    $libro = new ZipArchive;
+
+    expect($libro->open($excel->baseResponse->getFile()->getPathname()))->toBeTrue();
+    $hoja = $libro->getFromName('xl/worksheets/sheet1.xml');
+    $libro->close();
+
+    expect($hoja)
+        ->toContain('SUBTOTAL')
+        ->toContain('Venta especial')
+        ->toContain('TRANSFERENCIAS')
+        ->toContain('TOTAL')
+        ->not->toContain('TARJETA');
+    expect($hoja)
+        ->toContain('<v>120</v>')
+        ->toContain('<v>788.5</v>')
+        ->not->toContain('<v>1028.5</v>');
 });
 
 test('el reporte rechaza importes manuales inválidos sin guardar cambios', function (string $monto) {

@@ -40,18 +40,13 @@ class ReporteDiarioExcelExportador
             DEFAULT_ROW_HEIGHT: 22,
         );
         $options->mergeCells(0, 1, 5, 1);
-        $options->mergeCells(7, 1, 8, 1);
-        $options->mergeCells(10, 1, 11, 1);
-        $options->mergeCells(13, 1, 14, 1);
+        $options->mergeCells(1, 2, 5, 2);
         $options->setColumnWidth(10, 1);
         $options->setColumnWidth(30, 2);
         $options->setColumnWidth(21, 3);
         $options->setColumnWidth(18, 4);
         $options->setColumnWidth(16, 5);
         $options->setColumnWidth(28, 6);
-        $options->setColumnWidth(3, 7, 10, 13);
-        $options->setColumnWidth(20, 8, 11, 14);
-        $options->setColumnWidth(16, 9, 12, 15);
 
         $writer = new Writer($options);
         $creado = false;
@@ -65,14 +60,6 @@ class ReporteDiarioExcelExportador
                 fontSize: 18,
                 fontColor: 'FFFFFF',
                 backgroundColor: '0F766E',
-                cellVerticalAlignment: CellVerticalAlignment::CENTER,
-            );
-            $tarjetaTituloStyle = new Style(
-                fontBold: true,
-                fontSize: 13,
-                fontColor: 'FFFFFF',
-                backgroundColor: '0F172A',
-                cellAlignment: CellAlignment::CENTER,
                 cellVerticalAlignment: CellVerticalAlignment::CENTER,
             );
             $metaStyle = new Style(
@@ -124,151 +111,92 @@ class ReporteDiarioExcelExportador
                 cellVerticalAlignment: CellVerticalAlignment::CENTER,
             );
 
-            $valoresTitulo = array_fill(0, 15, null);
+            $valoresTitulo = array_fill(0, 6, null);
             $valoresTitulo[0] = 'REPORTE DE MEMBRESÍAS · BODY EVOLUTION GYM';
-            $estilosTitulo = [0 => $tituloStyle];
+            $writer->addRow(Row::fromValuesWithStyles($valoresTitulo, [0 => $tituloStyle], 34));
 
-            foreach (array_values($corte['metodos']) as $indice => $metodo) {
-                $columna = [7, 10, 13][$indice];
-                $valoresTitulo[$columna] = strtoupper($metodo['nombre']);
-                $estilosTitulo[$columna] = $tarjetaTituloStyle;
-            }
-
-            $writer->addRow(Row::fromValuesWithStyles($valoresTitulo, $estilosTitulo, 34));
-
-            $valoresMeta = array_fill(0, 15, null);
+            $valoresMeta = array_fill(0, 6, null);
             $valoresMeta[0] = 'Periodo';
             $valoresMeta[1] = $desde->format('d/m/Y H:i').' - '.$hasta->format('d/m/Y H:i');
             $estilosMeta = [0 => $metaStyle, 1 => $metaStyle];
-
-            foreach ([7, 10, 13] as $columna) {
-                $valoresMeta[$columna] = 'Concepto';
-                $valoresMeta[$columna + 1] = 'Importe';
-                $estilosMeta[$columna] = $encabezadoStyle;
-                $estilosMeta[$columna + 1] = $encabezadoStyle;
-            }
-
             $writer->addRow(Row::fromValuesWithStyles($valoresMeta, $estilosMeta));
 
-            $encabezados = array_fill(0, 15, null);
-            foreach ([
+            $encabezados = [
                 'ID',
                 'Nombre',
                 'Fecha y hora',
                 'Tipo de pago',
                 'Monto',
                 'Tipo de membresía',
-            ] as $indice => $encabezado) {
-                $encabezados[$indice] = $encabezado;
-            }
+            ];
+            $writer->addRow(Row::fromValuesWithStyles(
+                $encabezados,
+                array_fill(0, 6, $encabezadoStyle),
+            ));
 
-            $estilosEncabezado = array_fill(0, 6, $encabezadoStyle);
-            foreach ([
-                7 => 'Membresías',
-                10 => 'Membresías',
-                13 => 'Membresías',
-            ] as $columna => $concepto) {
-                $indiceMetodo = (int) (($columna - 7) / 3);
-                $encabezados[$columna] = $concepto;
-                $encabezados[$columna + 1] = (float) array_values($corte['metodos'])[$indiceMetodo]['membresias'];
-                $estilosEncabezado[$columna] = $cuerpoStyle;
-                $estilosEncabezado[$columna + 1] = $importeStyle;
-            }
-
-            $writer->addRow(Row::fromValuesWithStyles($encabezados, $estilosEncabezado));
-
-            $filasResumen = [];
-            $metodos = array_values($corte['metodos']);
-
-            foreach ($metodos as $indice => $metodo) {
-                $filasMetodo = [];
-
-                foreach ($metodo['ajustes'] as $ajuste) {
-                    $filasMetodo[] = [
-                        $ajuste['concepto'],
-                        $ajuste['monto'] === '' ? 0.0 : (float) $ajuste['monto'],
-                    ];
-                }
-
-                $filasMetodo[] = ['TOTAL', (float) $metodo['total']];
-                $filasResumen[$indice] = $filasMetodo;
-            }
-
-            $iteradorMembresias = (static function () use ($membresias): iterable {
-                yield from $membresias;
-            })();
-            $iteradorMembresias->rewind();
-            $hayMembresias = $iteradorMembresias->valid();
             $cantidadFilasMembresias = 0;
-            $filasDeResumen = max(array_map('count', $filasResumen));
 
-            for (
-                $indiceFila = 0;
-                $hayMembresias || $indiceFila < $filasDeResumen;
-                $indiceFila++
-            ) {
-                $fila = array_fill(0, 15, null);
-                $estilosFila = [];
-
-                if ($hayMembresias) {
-                    $membresia = $iteradorMembresias->current();
-                    $fila[0] = $membresia->cliente_id === null ? '—' : (int) $membresia->cliente_id;
-                    $fila[1] = $membresia->cliente_id === null
+            foreach ($membresias as $membresia) {
+                $fila = [
+                    $membresia->cliente_id === null ? '—' : (int) $membresia->cliente_id,
+                    $membresia->cliente_id === null
                         ? (trim((string) $membresia->nombre_comprador) ?: 'Venta sin cliente')
-                        : trim($membresia->cliente_nombre.' '.$membresia->cliente_apellido);
-                    $fila[2] = CarbonImmutable::parse($membresia->fecha, 'UTC')
+                        : trim($membresia->cliente_nombre.' '.$membresia->cliente_apellido),
+                    CarbonImmutable::parse($membresia->fecha, 'UTC')
                         ->setTimezone((string) config('app.display_timezone'))
-                        ->format('d/m/Y H:i');
-                    $fila[3] = $this->nombreMetodo($membresia->metodo_pago);
-                    $fila[4] = (float) $membresia->monto;
-                    $fila[5] = $membresia->tipo_membresia ?? 'Membresía';
-
-                    $estiloFila = $cantidadFilasMembresias % 2 === 0 ? $cuerpoStyle : $cuerpoAlternoStyle;
-                    $estilosFila = array_fill(0, 6, $estiloFila);
-                    $estilosFila[4] = $importeStyle;
-                    $cantidadFilasMembresias++;
-
-                    $iteradorMembresias->next();
-                    $hayMembresias = $iteradorMembresias->valid();
-                }
-
-                foreach ($filasResumen as $indiceMetodo => $filasMetodo) {
-                    if (! isset($filasMetodo[$indiceFila])) {
-                        continue;
-                    }
-
-                    [$concepto, $monto] = $filasMetodo[$indiceFila];
-                    $columna = [7, 10, 13][$indiceMetodo];
-                    $esTotal = $concepto === 'TOTAL';
-                    $fila[$columna] = $concepto;
-                    $fila[$columna + 1] = $monto;
-                    $estilosFila[$columna] = $esTotal ? $totalStyle : $cuerpoStyle;
-                    $estilosFila[$columna + 1] = $esTotal
-                        ? $totalImporteStyle
-                        : ($monto < 0 ? $importeNegativoStyle : $importeStyle);
-                }
+                        ->format('d/m/Y H:i'),
+                    $this->nombreMetodo($membresia->metodo_pago),
+                    (float) $membresia->monto,
+                    $membresia->tipo_membresia ?? 'Membresía',
+                ];
+                $estiloFila = $cantidadFilasMembresias % 2 === 0 ? $cuerpoStyle : $cuerpoAlternoStyle;
+                $estilosFila = array_fill(0, 6, $estiloFila);
+                $estilosFila[4] = $importeStyle;
+                $cantidadFilasMembresias++;
 
                 $writer->addRow(Row::fromValuesWithStyles($fila, $estilosFila));
             }
 
-            $filaTotal = array_fill(0, 15, null);
-            $filaTotal[0] = 'TOTAL MEMBRESÍAS';
-            $filaTotal[4] = (float) $corte['membresias_total'];
-            $filaTotal[7] = 'TOTAL DEL CORTE';
-            $filaTotal[8] = (float) $corte['total'];
-            $writer->addRow(Row::fromValuesWithStyles(
-                $filaTotal,
-                [
-                    0 => $totalStyle,
-                    1 => $totalStyle,
-                    2 => $totalStyle,
-                    3 => $totalStyle,
-                    4 => $totalImporteStyle,
-                    5 => $totalStyle,
-                    7 => $totalStyle,
-                    8 => $totalImporteStyle,
-                ],
-            ));
+            $membresiasCentavos = $this->centavos($corte['membresias_total']);
+            $ajustesEfectivo = $corte['metodos']['efectivo']['ajustes'];
+            $efectivoCentavos = 0;
+            $transferenciasCentavos = 0;
+
+            $this->agregarFilaResumen($writer, 'SUBTOTAL', $membresiasCentavos, true, $totalStyle, $totalImporteStyle);
+
+            foreach ($ajustesEfectivo as $ajuste) {
+                $montoCentavos = $this->centavos($ajuste['monto']);
+                $efectivoCentavos += $montoCentavos;
+                $this->agregarFilaResumen(
+                    $writer,
+                    $ajuste['concepto'],
+                    $montoCentavos,
+                    false,
+                    $cuerpoStyle,
+                    $montoCentavos < 0 ? $importeNegativoStyle : $importeStyle,
+                );
+            }
+
+            foreach ($corte['metodos']['transferencia']['ajustes'] as $ajuste) {
+                $transferenciasCentavos += $this->centavos($ajuste['monto']);
+            }
+
+            $this->agregarFilaResumen(
+                $writer,
+                'TRANSFERENCIAS',
+                $transferenciasCentavos,
+                true,
+                $totalStyle,
+                $totalImporteStyle,
+            );
+            $this->agregarFilaResumen(
+                $writer,
+                'TOTAL',
+                $membresiasCentavos + $efectivoCentavos - $transferenciasCentavos,
+                true,
+                $totalStyle,
+                $totalImporteStyle,
+            );
 
             $creado = true;
 
@@ -290,5 +218,44 @@ class ReporteDiarioExcelExportador
             'transferencia' => 'Transferencia',
             default => $metodoPago,
         };
+    }
+
+    private function agregarFilaResumen(
+        Writer $writer,
+        string $concepto,
+        int $centavos,
+        bool $destacado,
+        Style $estiloConcepto,
+        Style $estiloImporte,
+    ): void {
+        $fila = [
+            $concepto,
+            null,
+            null,
+            null,
+            $centavos / 100,
+            null,
+        ];
+        $estilos = [
+            0 => $estiloConcepto,
+            4 => $estiloImporte,
+        ];
+
+        if ($destacado) {
+            $estilos += array_fill(0, 6, $estiloConcepto);
+            $estilos[4] = $estiloImporte;
+        }
+
+        $writer->addRow(Row::fromValuesWithStyles($fila, $estilos));
+    }
+
+    private function centavos(string $monto): int
+    {
+        $monto = (string) ($monto === '' ? '0' : $monto);
+        $signo = str_starts_with($monto, '-') ? -1 : 1;
+        $monto = ltrim($monto, '+-');
+        [$entero, $decimal] = array_pad(explode('.', $monto, 2), 2, '0');
+
+        return $signo * (((int) $entero * 100) + (int) str_pad(substr($decimal, 0, 2), 2, '0'));
     }
 }
