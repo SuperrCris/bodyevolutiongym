@@ -341,8 +341,8 @@ test('el corte diario muestra membresías por método de pago y exporta el CSV d
     expect($hoja)
         ->toContain('Plan anual')
         ->toContain('Luis')
-        ->toContain('Aguas')
-        ->toContain('Salidas');
+        ->toContain('AGUAS')
+        ->toContain('SALIDAS');
     expect($estilos)->toContain('fills');
 });
 
@@ -439,8 +439,55 @@ test('el reporte filtra membresías por fecha y hora e incluye completos los aju
     expect($hoja)
         ->toContain('Inicio')
         ->toContain('Dentro')
+        ->toContain('SUBTOTAL')
+        ->toContain('AGUAS')
+        ->toContain('SALIDAS')
+        ->toContain('TRANSFERENCIAS')
+        ->toContain('TOTAL')
         ->not->toContain('Antes')
         ->not->toContain('Despu');
+
+    $subtotal = strpos($hoja, 'SUBTOTAL');
+    $aguas = strpos($hoja, 'AGUAS');
+    $salidas = strpos($hoja, 'SALIDAS');
+    $transferencias = strpos($hoja, 'TRANSFERENCIAS');
+    $total = strpos($hoja, 'TOTAL', $transferencias);
+
+    expect($subtotal)->toBeLessThan($aguas);
+    expect($aguas)->toBeLessThan($salidas);
+    expect($salidas)->toBeLessThan($transferencias);
+    expect($transferencias)->toBeLessThan($total);
+
+    $transferencia = Pago::create([
+        'tipo_membresia_id' => $plan->id,
+        'usuario_id' => $recepcionista->id,
+        'monto' => 40.00,
+        'metodo_pago' => 'transfer',
+    ]);
+    DB::table('pagos')
+        ->where('id', $transferencia->id)
+        ->update(['created_at' => '2026-10-29 12:00:00']);
+    DB::table('reporte_ajustes_manuales')->insert([
+        'fecha' => '2026-10-29',
+        'metodo_pago' => 'transferencia',
+        'concepto' => 'Comisión transferencia',
+        'monto' => '10.00',
+        'orden' => 0,
+        'usuario_id' => $recepcionista->id,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $excelConTransferencias = $this->get('/reportes/excel?'.http_build_query($parametros))
+        ->assertOk();
+    $libro = new ZipArchive;
+    expect($libro->open($excelConTransferencias->baseResponse->getFile()->getPathname()))->toBeTrue();
+    $hoja = $libro->getFromName('xl/worksheets/sheet1.xml');
+    $libro->close();
+
+    expect($hoja)
+        ->toContain('<v>-50</v>')
+        ->toContain('<v>167</v>');
 
     $this->get('/reportes?desde=2026-10-29&hora_desde=15:00&hasta=2026-10-29&hora_hasta=14:59')
         ->assertSessionHasErrors([

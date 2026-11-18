@@ -312,7 +312,7 @@ $navegadorAbierto = $false
 while ($true) {
     $laravelProcess = Start-Process `
         -FilePath $php `
-        -ArgumentList @('-S', '127.0.0.1:8000', '-t', $publicDirectory, $routerScript) `
+        -ArgumentList ('-S 127.0.0.1:8000 -t "{0}" "{1}"' -f $publicDirectory, $routerScript) `
         -WorkingDirectory $root `
         -WindowStyle Hidden `
         -PassThru
