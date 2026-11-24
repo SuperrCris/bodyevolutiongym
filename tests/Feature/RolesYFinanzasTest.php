@@ -489,6 +489,19 @@ test('el reporte filtra membresías por fecha y hora e incluye completos los aju
         ->toContain('<v>-50</v>')
         ->toContain('<v>167</v>');
 
+    $hojaXml = simplexml_load_string($hoja);
+    $hojaXml->registerXPathNamespace('x', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main');
+    $estilo = static function (string $concepto, string $columna) use ($hojaXml): string {
+        $celdas = $hojaXml->xpath("//x:row[x:c/x:is/x:t='{$concepto}']/x:c[starts-with(@r, '{$columna}')]");
+
+        return (string) $celdas[0]['s'];
+    };
+
+    expect($estilo('SUBTOTAL', 'D'))->toBe($estilo('TOTAL', 'D'))
+        ->not->toBe($estilo('TRANSFERENCIAS', 'D'));
+    expect($estilo('TRANSFERENCIAS', 'D'))->toBe($estilo('AGUAS', 'D'));
+    expect($estilo('TRANSFERENCIAS', 'E'))->toBe($estilo('SALIDAS', 'E'));
+
     $this->get('/reportes?desde=2026-10-29&hora_desde=15:00&hasta=2026-10-29&hora_hasta=14:59')
         ->assertSessionHasErrors([
             'hasta' => 'El momento final debe ser igual o posterior al momento inicial.',

@@ -185,9 +185,9 @@ class ReporteDiarioExcelExportador
                 $writer,
                 'TRANSFERENCIAS',
                 -$transferenciasCentavos,
-                true,
-                $totalStyle,
-                $totalImporteStyle,
+                false,
+                $cuerpoStyle,
+                $transferenciasCentavos > 0 ? $importeNegativoStyle : $importeStyle,
             );
 
             $this->agregarFilaResumen(
