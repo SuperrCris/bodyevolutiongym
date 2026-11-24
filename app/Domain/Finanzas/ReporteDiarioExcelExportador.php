@@ -160,7 +160,7 @@ class ReporteDiarioExcelExportador
             $membresiasCentavos = $this->centavos($corte['membresias_total']);
             $ajustesEfectivo = $corte['metodos']['efectivo']['ajustes'];
             $efectivoCentavos = 0;
-            $transferenciasCentavos = 0;
+            $transferenciasCentavos = $this->centavos($corte['metodos']['transferencia']['membresias']);
 
             $this->agregarFilaResumen($writer, 'SUBTOTAL', $membresiasCentavos, true, $totalStyle, $totalImporteStyle);
 
@@ -169,7 +169,7 @@ class ReporteDiarioExcelExportador
                 $efectivoCentavos += $montoCentavos;
                 $this->agregarFilaResumen(
                     $writer,
-                    $ajuste['concepto'],
+                    strtoupper($ajuste['concepto']),
                     $montoCentavos,
                     false,
                     $cuerpoStyle,
@@ -184,11 +184,12 @@ class ReporteDiarioExcelExportador
             $this->agregarFilaResumen(
                 $writer,
                 'TRANSFERENCIAS',
-                $transferenciasCentavos,
+                -$transferenciasCentavos,
                 true,
                 $totalStyle,
                 $totalImporteStyle,
             );
+
             $this->agregarFilaResumen(
                 $writer,
                 'TOTAL',
@@ -229,15 +230,15 @@ class ReporteDiarioExcelExportador
         Style $estiloImporte,
     ): void {
         $fila = [
+            null,
+            null,
+            null,
             $concepto,
-            null,
-            null,
-            null,
             $centavos / 100,
             null,
         ];
         $estilos = [
-            0 => $estiloConcepto,
+            3 => $estiloConcepto,
             4 => $estiloImporte,
         ];
 
